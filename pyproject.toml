@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "your-project-name"
+name = "phi-project"
 version = "0.1.0"
 description = "FastAPI server for web scraping and AI processing"
 authors = ["Your Name <your.email@example.com>"]

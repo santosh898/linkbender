@@ -8,10 +8,14 @@ from datetime import datetime
 
 from phi.agent import Agent
 from phi.model.ollama import Ollama
+from phi.model.openai import OpenAIChat
 from phi.embedder.ollama import OllamaEmbedder
 
 from phi.knowledge.json import JSONKnowledgeBase
 from phi.vectordb.pgvector import PgVector
+from dotenv import load_dotenv
+
+load_dotenv()
 
 knowledge_base = JSONKnowledgeBase(
     path="knowledge",
@@ -23,15 +27,35 @@ knowledge_base = JSONKnowledgeBase(
     ),
 )
 
-knowledge_base.load(recreate=True, upsert=True)
+# knowledge_base.load(recreate=True, upsert=True)
 
 agent = Agent(
-    model=Ollama(id="llama3.2:3b"),
+    model = OpenAIChat(id="gpt-4o"),
     knowledge=knowledge_base,
     show_tool_calls=True,
     markdown=True,
     # debug_mode=True,
 )
+
+# When tagging content, please use tags from this predefined list:
+#         {chr(10).join(f"- {tag}" for tag in existing_tags)}
+        
+#         try to assign the most relevant tags from this list. Make up new tags if none of the existing tags fit. Make up tags even if some of the existing tags match. Our Main goal is to have tags that define the content the best.
+
+summary_agent = Agent(
+        model = OpenAIChat(id="gpt-4o"),
+        show_tool_calls=True,
+        structured_output=True,
+        instructions=[f"""
+        You are a helpful assistant that summarizes text and creates a list of tags that define the content of the text.
+        try to assign the most relevant tags. Our Main goal is to have tags that define the content the best.
+        You respond with a json object with the following keys:
+        - summary: a summary of the text
+        - tags: a list of tags that define the content of the text
+        The json object should be valid and not contain any errors and parsable. I don't want any markdown in the response.
+        """],
+        # debug_mode=True,
+    )
 
 app = FastAPI()
 db = TinyDB('scrape_db.json')
@@ -59,13 +83,16 @@ async def scrape(link: str):
         text = soup.get_text()
         lines = (line.strip() for line in text.splitlines())
         text = ' '.join(line for line in lines if line)
+
+        response = summary_agent.run(text)
+
         
-        # Store in JSON database
-        doc_id = scrapes.insert({
-            'url': link,
-            'content': text,
-            'timestamp': datetime.now().isoformat()
-        })
+        # # Store in JSON database
+        # doc_id = scrapes.insert({
+        #     'url': link,
+        #     'content': text,
+        #     'timestamp': datetime.now().isoformat()
+        # })
 
         # knowledge_base.load(
         #    upsert=True
@@ -74,7 +101,7 @@ async def scrape(link: str):
         return {
             "text": text, 
             "status": "success",
-            "id": doc_id
+            "response": response
         }
     except Exception as e:
         return {"error": str(e), "status": "error"}
