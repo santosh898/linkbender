@@ -123,13 +123,18 @@ function App() {
                     <div className="absolute transitiona-all duration-1000 opacity-30 -inset-px bg-gradient-to-r from-[#44BCFF] via-[#FF44EC] to-[#FF675E] rounded-xl blur-lg">
                     </div>
                     <div className="relative">
-                      <h3 className="text-xl mb-2">
+                      <h3 className="text-xl mb-2 flex items-center gap-2">
                         <a href={item.url} 
                            target="_blank" 
                            rel="noopener noreferrer"
                            className="text-[#44BCFF] hover:text-[#FF44EC] transition-colors">
                           {item.url}
                         </a>
+                        {item.grade && (
+                          <span className="px-2 py-0.5 text-sm rounded bg-[#44BCFF]/10 text-[#44BCFF] border border-[#44BCFF]/30 ml-auto">
+                            Grade: {item.grade}
+                          </span>
+                        )}
                       </h3>
                       <p className="text-white/80 mb-4">{item.summary}</p>
                       <div className="flex flex-wrap gap-2">
@@ -150,8 +155,15 @@ function App() {
                 <div className="absolute transitiona-all duration-1000 opacity-30 -inset-px bg-gradient-to-r from-[#44BCFF] via-[#FF44EC] to-[#FF675E] rounded-xl blur-lg">
                 </div>
                 <div className="relative">
-                  <h3 className="text-2xl font-bold bg-gradient-to-r from-[#44BCFF] via-[#FF44EC] to-[#FF675E] inline-block text-transparent bg-clip-text mb-4">
-                    {results.is_duplicate ? 'Cached Result' : 'Scrape Result'}
+                  <h3 className="text-2xl font-bold mb-4 flex items-center gap-3">
+                    <span className="bg-gradient-to-r from-[#44BCFF] via-[#FF44EC] to-[#FF675E] inline-block text-transparent bg-clip-text">
+                      {results.is_duplicate ? 'Cached Result' : 'Scrape Result'}
+                    </span>
+                    {results.response?.grade && (
+                      <span className="px-2 py-0.5 text-sm rounded bg-[#44BCFF]/10 text-[#44BCFF] border border-[#44BCFF]/30 ml-auto">
+                        Grade: {results.response.grade}
+                      </span>
+                    )}
                   </h3>
                   {results.message && (
                     <p className="text-yellow-400 mb-4 italic">

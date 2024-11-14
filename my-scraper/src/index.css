@@ -55,8 +55,9 @@
 }
 
 @keyframes scan {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(400%); }
+  0% {top:10px; }
+  50% { top:calc(100% - 10px); }
+  100% { top:10px; }
 }
 
 .cyber-box::before {
@@ -72,6 +73,6 @@
     theme('colors.cyber.secondary') 50%,
     theme('colors.cyber.tertiary') 100%
   );
-  animation: scan 3s ease-in-out infinite;
+  animation: scan 6s ease-in-out infinite;
   opacity: 0.5;
 } 

@@ -1,6 +1,6 @@
 # fast api server with a get endpoint to take a link and scrape the text from the page
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -20,13 +20,21 @@ summary_agent = Agent(
     show_tool_calls=True,
     structured_output=True,
     instructions=["""
-    You are a text analysis agent. For any given text, provide a concise summary and relevant tags.
-    ONLY respond with a clean JSON object in this exact format:
-    {
-        "summary": "your 2-3 sentence summary here",
-        "tags": ["tag1", "tag2", "tag3"]
-    }
-    DO NOT include any markdown formatting, code blocks, or additional text.
+            Analyze the following link's content and provide a concise summary, relevant tags, a grade, and an optional badge. 
+
+            For each output:
+            1. Give a 2-3 sentence summary of the content.
+            2. List tags based on topics covered in the link (e.g., "SEO," "content marketing").
+            3. Assign a grade from 1 to 10 based on relevance and content quality.
+            4. Optionally, assign a badge ("gold," "platinum," etc.) if the content is of high quality or widely recognized as an industry leader.
+
+            Format the response in a clean JSON object, like this:
+            {
+                "summary": "A brief summary of the content here.",
+                "tags": ["tag1", "tag2"],
+                "grade": "1-10",
+                "badge": "gold"
+            }
     """]
 )
 
@@ -45,7 +53,7 @@ app.add_middleware(
 username = quote_plus("chanakyabevera")
 password = quote_plus("Chanu@07041997")
 connection_string = f"mongodb+srv://{username}:{password}@clusterme.81rw1.mongodb.net/?retryWrites=true&w=majority"
-client = MongoClient(connection_string)
+client = MongoClient(connection_string,connect=False)
 db = client['scraping_db']
 collection = db['scrapes']
 tags_collection = db['tags']
@@ -111,7 +119,9 @@ async def scrape(link: str, force: bool = False):
             # Ensure required fields with proper types
             response_data = {
                 "summary": str(response_data.get("summary", "No summary available")),
-                "tags": [str(tag) for tag in response_data.get("tags", ["error"])]
+                "tags": [str(tag) for tag in response_data.get("tags", ["error"])],
+                "grade": str(response_data.get("grade", "error")),
+                "badge": str(response_data.get("badge", "error"))
             }
             
             # Before storing in MongoDB, process and update tags
@@ -140,6 +150,8 @@ async def scrape(link: str, force: bool = False):
                 'url': normalized_url,
                 'summary': response_data['summary'],
                 'tags': [tag.lower().strip() for tag in response_data['tags']],
+                'grade': response_data['grade'],
+                'badge': response_data['badge'],
                 'timestamp': datetime.now(),
                 'content': text[:1000]
             }
@@ -164,16 +176,27 @@ async def scrape(link: str, force: bool = False):
                     "tags": ["error"]
                 }
             }
+    
         except Exception as e:
             print(f"Response processing error: {e}")
             return {
                 "text": text[:500],
                 "status": "error",
-                "error": "Failed to process agent response"
+                "error": "Failed to process agent response",
+                "response": {
+                    "summary": str(agent_response.content)[:200],
+                    "response_data":response_data
+                }
             }
             
     except Exception as e:
-        return {"error": str(e), "status": "error"}
+        return {"error": str(e), "status": "error",
+                "text": text[:500],
+                "status": "error",
+                "response": {
+                    "summary": str(agent_response.content)[:200],
+                    "response_data":response_data
+                }}
 
 @app.get("/scrapes")
 async def get_scrapes():
@@ -229,7 +252,9 @@ async def search_by_tags(tags: str):
                 'summary': 1,
                 'tags': 1,
                 'content': {'$substr': ['$content', 0, 200]},  # First 200 chars as preview
-                'timestamp': 1
+                'timestamp': 1,
+                'grade': 1,
+                'badge': 1
             }
         ).sort('timestamp', -1).limit(4))
         
