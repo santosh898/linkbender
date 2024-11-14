@@ -13,17 +13,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Simplified agent setup
+# Simplified agent setup with clearer instructions
 summary_agent = Agent(
     model=xAI(id="grok-beta"),
     show_tool_calls=True,
     structured_output=True,
     instructions=["""
-    Summarize the text and create relevant tags. Respond with JSON:
+    You are a text analysis agent. For any given text, provide a concise summary and relevant tags.
+    ONLY respond with a clean JSON object in this exact format:
     {
-        "summary": "your summary here",
+        "summary": "your 2-3 sentence summary here",
         "tags": ["tag1", "tag2", "tag3"]
     }
+    DO NOT include any markdown formatting, code blocks, or additional text.
     """]
 )
 
@@ -36,6 +38,7 @@ connection_string = f"mongodb+srv://{username}:{password}@clusterme.81rw1.mongod
 client = MongoClient(connection_string)
 db = client['scraping_db']
 collection = db['scrapes']
+tags_collection = db['tags']
 
 @app.get("/scrape")
 async def scrape(link: str):
@@ -55,23 +58,89 @@ async def scrape(link: str):
         
         # Simplified agent response handling
         agent_response = summary_agent.run(text)
-        response_data = agent_response.content if isinstance(agent_response.content, dict) else json.loads(agent_response.content)
         
-        # Store in MongoDB
-        mongo_doc = {
-            'url': link,
-            'summary': response_data['summary'],
-            'tags': response_data['tags'],
-            'timestamp': datetime.now(),
-            'content': text[:1000]
-        }
-        collection.insert_one(mongo_doc)
-        
-        return {
-            "text": text[:500],
-            "status": "success",
-            "response": response_data
-        }
+        # Clean and parse the response
+        try:
+            # If response is already a dict, use it directly
+            if isinstance(agent_response.content, dict):
+                response_data = agent_response.content
+            else:
+                # Clean the string response
+                clean_response = (
+                    agent_response.content
+                    .replace('```json', '')
+                    .replace('```', '')
+                    .strip()
+                )
+                response_data = json.loads(clean_response)
+            
+            # Validate response structure
+            if not isinstance(response_data, dict):
+                raise ValueError("Response is not a dictionary")
+            
+            # Ensure required fields with proper types
+            response_data = {
+                "summary": str(response_data.get("summary", "No summary available")),
+                "tags": [str(tag) for tag in response_data.get("tags", ["error"])]
+            }
+            
+            # Before storing in MongoDB, process and update tags
+            existing_tags = set(tag['name'] for tag in tags_collection.find())
+            new_tags = []
+            
+            for tag in response_data['tags']:
+                tag = tag.lower().strip()  # Normalize tag
+                if tag not in existing_tags:
+                    # Add new tag to tags collection
+                    tags_collection.insert_one({
+                        'name': tag,
+                        'count': 1,
+                        'created_at': datetime.now()
+                    })
+                    new_tags.append(tag)
+                else:
+                    # Increment count for existing tag
+                    tags_collection.update_one(
+                        {'name': tag},
+                        {'$inc': {'count': 1}}
+                    )
+            
+            # Store in MongoDB with normalized tags
+            mongo_doc = {
+                'url': link,
+                'summary': response_data['summary'],
+                'tags': [tag.lower().strip() for tag in response_data['tags']],
+                'timestamp': datetime.now(),
+                'content': text[:1000]
+            }
+            collection.insert_one(mongo_doc)
+            
+            return {
+                "text": text[:500],
+                "status": "success",
+                "response": response_data,
+                "new_tags": new_tags
+            }
+            
+        except json.JSONDecodeError as e:
+            print(f"JSON parsing error: {e}")
+            print(f"Raw response: {agent_response.content}")
+            return {
+                "text": text[:500],
+                "status": "error",
+                "error": "Failed to parse agent response",
+                "response": {
+                    "summary": str(agent_response.content)[:200],
+                    "tags": ["error"]
+                }
+            }
+        except Exception as e:
+            print(f"Response processing error: {e}")
+            return {
+                "text": text[:500],
+                "status": "error",
+                "error": "Failed to process agent response"
+            }
             
     except Exception as e:
         return {"error": str(e), "status": "error"}
@@ -106,3 +175,8 @@ async def test_db():
             "status": "error",
             "message": str(e)
         }
+
+@app.get("/tags")
+async def get_tags():
+    tags_list = list(tags_collection.find({}, {'_id': 0}))
+    return {"tags": tags_list}
