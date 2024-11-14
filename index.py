@@ -10,6 +10,7 @@ from phi.model.xai import xAI
 from pymongo import MongoClient
 from urllib.parse import quote_plus
 from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
@@ -30,6 +31,15 @@ summary_agent = Agent(
 )
 
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # MongoDB setup
 username = quote_plus("chanakyabevera")
