@@ -60,6 +60,11 @@ tags_collection = db['tags']
 
 @app.get("/scrape")
 async def scrape(link: str, force: bool = False):
+    # Initialize variables that might be needed in error handling
+    text = ""
+    agent_response = None
+    response_data = {}
+
     try:
         # Normalize the URL
         parsed_url = urlparse(link)
@@ -168,40 +173,71 @@ async def scrape(link: str, force: bool = False):
             print(f"JSON parsing error: {e}")
             print(f"Raw response: {agent_response.content}")
             return {
-                "text": text[:500],
+                "text": text[:500] if text else "",
                 "status": "error",
                 "error": "Failed to parse agent response",
                 "response": {
-                    "summary": str(agent_response.content)[:200],
-                    "tags": ["error"]
+                    "summary": str(agent_response.content)[:200] if agent_response else "Error parsing response",
+                    "tags": ["error"],
+                    "grade": "0",
+                    "badge": "none"
                 }
             }
     
-        except Exception as e:
-            print(f"Response processing error: {e}")
-            return {
-                "text": text[:500],
-                "status": "error",
-                "error": "Failed to process agent response",
-                "response": {
-                    "summary": str(agent_response.content)[:200],
-                    "response_data":response_data
-                }
+    except requests.RequestException as e:
+        return {
+            "status": "error",
+            "error": f"Failed to fetch URL: {str(e)}",
+            "text": "",
+            "response": {
+                "summary": "Failed to fetch URL",
+                "tags": ["error"],
+                "grade": "0",
+                "badge": "none"
             }
+        }
             
     except Exception as e:
-        return {"error": str(e), "status": "error",
-                "text": text[:500],
-                "status": "error",
-                "response": {
-                    "summary": str(agent_response.content)[:200],
-                    "response_data":response_data
-                }}
+        return {
+            "status": "error",
+            "error": str(e),
+            "text": text[:500] if text else "",
+            "response": {
+                "summary": str(agent_response.content)[:200] if agent_response else "Error occurred",
+                "tags": ["error"],
+                "grade": "0",
+                "badge": "none"
+            }
+        }
 
 @app.get("/scrapes")
 async def get_scrapes():
-    scrapes_list = list(collection.find({}, {'_id': 0}))  # Exclude MongoDB _id field
-    return {"scrapes": scrapes_list}
+    try:
+        # Get all documents with all fields
+        scrapes_list = list(collection.find(
+            {},  # Empty query to get all documents
+            {
+                '_id': 0,  # Exclude MongoDB _id field
+                'url': 1,
+                'summary': 1,
+                'tags': 1,
+                'grade': 1,
+                'badge': 1,
+                'timestamp': 1,
+                'content': {'$substr': ['$content', 0, 200]}  # First 200 chars of content
+            }
+        ).sort('timestamp', -1))  # Sort by newest first
+        
+        return {
+            "status": "success",
+            "scrapes": scrapes_list,
+            "count": len(scrapes_list)
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
+        }
 
 @app.post("/ask")
 async def ask(question: str):
@@ -243,22 +279,22 @@ async def search_by_tags(tags: str):
         # Find documents that contain ANY of the provided tags
         query = {'tags': {'$in': tag_list}}
         
-        # Get matching documents, limit to 4, sort by timestamp (newest first)
+        # Get matching documents, include ALL fields
         results = list(collection.find(
             query,
             {
-                '_id': 0,
+                '_id': 0,  # Exclude MongoDB _id field
                 'url': 1,
                 'summary': 1,
                 'tags': 1,
-                'content': {'$substr': ['$content', 0, 200]},  # First 200 chars as preview
+                'grade': 1,    # Make sure grade is included
+                'badge': 1,    # Make sure badge is included
                 'timestamp': 1,
-                'grade': 1,
-                'badge': 1
+                'content': {'$substr': ['$content', 0, 200]}  # First 200 chars as preview
             }
         ).sort('timestamp', -1).limit(4))
         
-        # Get related tags (tags that appear together with search results)
+        # Get related tags
         related_tags = set()
         for doc in results:
             related_tags.update(doc.get('tags', []))
@@ -304,19 +340,44 @@ async def get_cached(url: str):
         parsed_url = urlparse(url)
         normalized_url = urljoin(url, parsed_url.path)
         
-        # Get cached data
-        doc = collection.find_one({'url': normalized_url})
-        
-        if doc:
-            return {
-                "response": {
-                    "summary": doc.get('summary'),
-                    "tags": doc.get('tags', [])
-                },
-                "text": doc.get('content', '')[:500],
-                "status": "cached",
-                "message": f"Retrieved from cache (scraped on {doc.get('timestamp').strftime('%Y-%m-%d %H:%M:%S')})"
+        # Get cached data with all fields explicitly
+        doc = collection.find_one(
+            {'url': normalized_url},
+            {
+                '_id': 0,
+                'url': 1,
+                'summary': 1,
+                'tags': 1,
+                'grade': 1,
+                'badge': 1,  # Explicitly include badge
+                'timestamp': 1,
+                'content': {'$substr': ['$content', 0, 500]}
             }
-        return {"error": "Cached data not found", "status": "error"}
+        )
+        
+        if not doc:
+            return {
+                "status": "error",
+                "error": "URL not found in cache"
+            }
+
+        # Format the response with all fields
+        return {
+            "status": "success",
+            "response": {
+                "url": doc.get('url'),
+                "summary": doc.get('summary'),
+                "tags": doc.get('tags', []),
+                "grade": doc.get('grade'),
+                "badge": doc.get('badge'),  # Include badge in response
+                "timestamp": doc.get('timestamp')
+            },
+            "message": f"Retrieved from cache (scraped on {doc.get('timestamp').strftime('%Y-%m-%d %H:%M:%S')})",
+            "cached": True
+        }
+
     except Exception as e:
-        return {"error": str(e), "status": "error"}
+        return {
+            "status": "error",
+            "error": f"Failed to retrieve cached data: {str(e)}"
+        }

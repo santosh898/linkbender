@@ -1,191 +1,265 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
 function App() {
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [input, setInput] = useState('');
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
+  // STEP 1: URL CHECK FUNCTION
+  const checkUrl = async (url) => {
+    try {
+      const response = await fetch(`http://localhost:8000/check-url?url=${encodeURIComponent(url)}`);
+      if (!response.ok) throw new Error('Failed to check URL');
+      const data = await response.json();
+      console.log('URL Check Response:', data); // Debug log
+      return data;
+    } catch (error) {
+      throw new Error(`URL check failed: ${error.message}`);
+    }
+  };
+
+  // STEP 2A: GET CACHED DATA
+  const getCachedData = async (url) => {
+    try {
+      const response = await fetch(`http://localhost:8000/get-cached?url=${encodeURIComponent(url)}`);
+      if (!response.ok) throw new Error('Failed to get cached data');
+      const data = await response.json();
+      console.log('Cached Data:', data); // Debug log
+      return data;
+    } catch (error) {
+      throw new Error(`Cache retrieval failed: ${error.message}`);
+    }
+  };
+
+  // STEP 2B: SCRAPE NEW URL
+  const scrapeNewUrl = async (url) => {
+    try {
+      const response = await fetch(`http://localhost:8000/scrape?url=${encodeURIComponent(url)}`);
+      if (!response.ok) throw new Error('Failed to scrape URL');
+      const data = await response.json();
+      console.log('Scraped Data:', data); // Debug log
+      return data;
+    } catch (error) {
+      throw new Error(`Scraping failed: ${error.message}`);
+    }
+  };
+
+  // STEP 3: SEARCH FUNCTION
+  const searchByTags = async (tags) => {
+    try {
+      const response = await fetch(`http://localhost:8000/search-by-tags?tags=${encodeURIComponent(tags)}`);
+      if (!response.ok) throw new Error('Failed to search tags');
+      const data = await response.json();
+      console.log('Search Results:', data); // Debug log
+      return data;
+    } catch (error) {
+      throw new Error(`Tag search failed: ${error.message}`);
+    }
+  };
+
+  // MAIN SUBMISSION HANDLER
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const trimmedInput = input.trim();
+    if (!trimmedInput) return;
+
     setLoading(true);
+    setError(null);
+    setResults(null);
 
     try {
       if (isSearchMode) {
-        const response = await fetch(`http://localhost:8000/search-by-tags?tags=${input}`);
-        const data = await response.json();
-        setResults(data);
+        // SEARCH MODE FLOW
+        console.log('Starting search for tags:', trimmedInput);
+        const searchData = await searchByTags(trimmedInput);
+        
+        // Map the DB structure directly to results
+        setResults({
+          searchResults: searchData.results.map(result => ({
+            id: result._id,
+            url: result.url,
+            summary: result.summary,
+            grade: result.grade,
+            badge: result.badge,
+            tags: result.tags,
+            timestamp: result.timestamp
+          })),
+          count: searchData.results.length,
+          isSearch: true
+        });
       } else {
-        // First, check if URL exists
-        const checkResponse = await fetch(`http://localhost:8000/check-url?url=${encodeURIComponent(input)}`);
-        const checkData = await checkResponse.json();
-
-        if (checkData.exists) {
-          // If URL exists, fetch the cached data
-          const response = await fetch(`http://localhost:8000/get-cached?url=${encodeURIComponent(input)}`);
-          const data = await response.json();
-          setResults({
-            ...data,
-            is_duplicate: true,
-            message: checkData.message
-          });
-        } else {
-          // If URL doesn't exist, proceed with scraping
-          const response = await fetch(`http://localhost:8000/scrape?link=${encodeURIComponent(input)}`);
-          const data = await response.json();
-          setResults({
-            ...data,
-            is_duplicate: false
-          });
+        // SCRAPE MODE FLOW
+        console.log('Starting scrape for URL:', trimmedInput);
+        
+        // 1. Validate URL format
+        try {
+          new URL(trimmedInput);
+        } catch {
+          throw new Error('Please enter a valid URL');
         }
-      }
-    } catch (error) {
-      console.error(error);
-      setResults({ error: 'An error occurred' });
-    }
 
-    setLoading(false);
+        // 2. Check if URL exists
+        console.log('Checking URL existence...');
+        const urlCheck = await checkUrl(trimmedInput);
+        
+        // 3. Get data based on URL check
+        console.log('URL exists:', urlCheck.exists);
+        const data = urlCheck.exists 
+          ? await getCachedData(trimmedInput)
+          : await scrapeNewUrl(trimmedInput);
+
+        // 4. Process and set results
+        console.log('Processing final data:', data);
+        setResults({
+          url: trimmedInput,
+          summary: data.response.summary,
+          grade: data.response.grade,
+          tags: data.response.tags,
+          is_duplicate: urlCheck.exists,
+          message: data.message,
+          isSearch: false
+        });
+      }
+    } catch (err) {
+      console.error('Error in submission:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // MODE SWITCH HANDLER
+  const handleModeChange = useCallback((checked) => {
+    console.log('Switching mode to:', checked ? 'Search' : 'Scrape');
+    setIsSearchMode(checked);
+    setInput('');
+    setResults(null);
+    setError(null);
+  }, []);
+
+  // INPUT CHANGE HANDLER
+  const handleInputChange = useCallback((e) => {
+    setInput(e.target.value);
+    setError(null);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-black p-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="bg-gradient-to-r from-[#44BCFF] via-[#FF44EC] to-[#FF675E] inline-block text-transparent bg-clip-text text-6xl font-bold mb-12 text-center">
-          Neural Scraper
-        </h1>
-        
-        <div className="mb-8 text-center">
-          <div className="flex flex-col items-center">
-            <label className="relative mb-2 cursor-pointer">
-              <input 
-                type="checkbox" 
-                checked={isSearchMode}
-                onChange={(e) => setIsSearchMode(e.target.checked)}
-                className="peer sr-only" 
-              />
-              <div className="peer h-6 w-11 rounded-full bg-gray-900 after:absolute after:top-[2px] after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-[#FF44EC] after:bg-gray-900 after:transition-all after:content-[''] peer-checked:bg-gradient-to-r peer-checked:from-[#44BCFF] peer-checked:via-[#FF44EC] peer-checked:to-[#FF675E] peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none"></div>
-            </label>
-            <span className="text-xs bg-gradient-to-r from-[#44BCFF] via-[#FF44EC] to-[#FF675E] inline-block text-transparent bg-clip-text font-medium">
-              {isSearchMode ? 'Search Mode' : 'Scrape Mode'}
-            </span>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="relative flex gap-2">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={isSearchMode ? 'Enter tags to search' : 'Enter URL to scrape'}
-              className="flex-1 px-4 py-3 bg-gray-900 text-white 
-                       border-2 border-[#FF44EC]/50 focus:border-[#FF44EC] 
-                       placeholder-white/50 rounded-none"
+    <div className="min-h-screen bg-gray-100 p-8">
+      {/* Mode Toggle */}
+      <div className="mb-8 text-center">
+        <div className="flex flex-col items-center">
+          <label className="relative inline-block cursor-pointer mb-2">
+            <input 
+              type="checkbox" 
+              checked={isSearchMode}
+              onChange={(e) => handleModeChange(e.target.checked)}
+              className="sr-only" 
             />
-            <div className="relative inline-flex group">
-              <div className="absolute transitiona-all duration-1000 opacity-70 -inset-px bg-gradient-to-r from-[#44BCFF] via-[#FF44EC] to-[#FF675E] rounded-xl blur-lg group-hover:opacity-100 group-hover:-inset-1 group-hover:duration-200 animate-tilt">
+            <div className="relative">
+              <span className="absolute top-0 left-0 mt-0.5 ml-0.5 h-full w-full rounded-full bg-gray-700"></span>
+              <div className="relative h-8 w-16 rounded-full border-2 border-black bg-white transition-colors duration-200 ease-in-out">
+                <div className={`absolute top-1 ${isSearchMode ? 'left-8' : 'left-1'} h-5 w-5 rounded-full border-2 border-black bg-black transition-all duration-200 ease-in-out`}></div>
               </div>
-              <button  
-                type="submit" 
-                className="relative inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-white transition-all duration-200 bg-gray-900 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={loading || !input.trim()}
-              >
-                {loading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Processing... 
-                  </div>
-                ) : (
-                  isSearchMode ? 'Search' : 'Scrape'
-                )}
-              </button>
             </div>
-          </div>
-        </form>
+          </label>
+          <span className="text-sm font-bold text-white">
+            {isSearchMode ? 'Search Mode' : 'Scrape Mode'}
+          </span>
+        </div>
+      </div>
 
-        {loading && (
-          <div className="flex justify-center items-center my-12">
-            <div className="w-12 h-12 border-4 border-cyber-primary 
-                          border-t-transparent rounded-full animate-spin">
-            </div>
-          </div>
-        )}
+      {/* Input Form */}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="relative flex gap-2">
+          <input
+            type="text"
+            value={input}
+            onChange={handleInputChange}
+            placeholder={isSearchMode ? 'Enter tags to search' : 'Enter URL to scrape'}
+            className="flex-1 px-4 py-3 bg-white text-black 
+                     border-2 border-black rounded 
+                     placeholder-gray-600 font-medium"
+          />
+          <button  
+            type="submit" 
+            className="relative inline-block w-full rounded border-2 border-black bg-black px-8 py-3 
+                     text-base font-bold text-white transition duration-100 
+                     hover:bg-gray-900 hover:text-yellow-500 disabled:opacity-50 
+                     disabled:cursor-not-allowed disabled:hover:bg-black disabled:hover:text-white"
+            disabled={loading || !input.trim()}
+          >
+            {loading ? 'Processing...' : (isSearchMode ? 'Search' : 'Scrape')}
+          </button>
+        </div>
+      </form>
 
-        {results && !loading && (
-          <div className="mt-8 space-y-4">
-            {isSearchMode ? (
-              <div>
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-[#44BCFF] via-[#FF44EC] to-[#FF675E] inline-block text-transparent bg-clip-text mb-4">
-                  Search Results ({results.count})
-                </h2>
-                {results.results?.map((item, index) => (
-                  <div key={index} className="cyber-box p-6 mb-4 bg-gray-900 relative">
-                    <div className="absolute transitiona-all duration-1000 opacity-30 -inset-px bg-gradient-to-r from-[#44BCFF] via-[#FF44EC] to-[#FF675E] rounded-xl blur-lg">
+      {/* Error Display */}
+      {error && (
+        <div className="mt-4 p-4 bg-red-100 border-2 border-red-500 rounded text-red-700">
+          {error}
+        </div>
+      )}
+
+      {/* Results Display */}
+      {results && !loading && (
+        <div className="mt-8">
+          {results.isSearch ? (
+            // Search Results Display
+            <div className="space-y-4">
+              <div className="mb-4">
+                <h3 className="text-lg font-bold">
+                  Found {results.searchResults.length} results
+                </h3>
+                {results.searchResults.map((result) => (
+                  <div key={result.id} className="mb-4 p-4 bg-white rounded border-2 border-black">
+                    <h4 className="font-bold">{result.url}</h4>
+                    <p className="text-gray-700">{result.summary}</p>
+                    <div className="mt-2">
+                      <span className="font-bold mr-4">Grade: {result.grade}</span>
+                      <span className="font-bold">Badge: {result.badge}</span>
                     </div>
-                    <div className="relative">
-                      <h3 className="text-xl mb-2 flex items-center gap-2">
-                        <a href={item.url} 
-                           target="_blank" 
-                           rel="noopener noreferrer"
-                           className="text-[#44BCFF] hover:text-[#FF44EC] transition-colors">
-                          {item.url}
-                        </a>
-                        {item.grade && (
-                          <span className="px-2 py-0.5 text-sm rounded bg-[#44BCFF]/10 text-[#44BCFF] border border-[#44BCFF]/30 ml-auto">
-                            Grade: {item.grade}
-                          </span>
-                        )}
-                      </h3>
-                      <p className="text-white/80 mb-4">{item.summary}</p>
-                      <div className="flex flex-wrap gap-2">
-                        {item.tags.map((tag, i) => (
-                          <span key={i} className="px-3 py-1 rounded-full text-sm 
-                                               bg-[#FF44EC]/10 text-[#FF44EC] 
-                                               border border-[#FF44EC]/30">
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
+                    <div className="mt-2">
+                      {result.tags.map((tag, i) => (
+                        <span key={i} className="mr-2 px-2 py-1 bg-gray-200 rounded">
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="mt-2 text-sm text-gray-500">
+                      Added: {new Date(result.timestamp).toLocaleDateString()}
                     </div>
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="cyber-box p-6 bg-gray-900 relative">
-                <div className="absolute transitiona-all duration-1000 opacity-30 -inset-px bg-gradient-to-r from-[#44BCFF] via-[#FF44EC] to-[#FF675E] rounded-xl blur-lg">
+            </div>
+          ) : (
+            // Scrape Results Display
+            <div className="p-4 bg-white rounded border-2 border-black">
+              <h3 className="font-bold">{results.url}</h3>
+              <p className="text-gray-700 mt-2">{results.summary}</p>
+              {results.grade && (
+                <div className="mt-2">
+                  <span className="font-bold">Grade: {results.grade}</span>
                 </div>
-                <div className="relative">
-                  <h3 className="text-2xl font-bold mb-4 flex items-center gap-3">
-                    <span className="bg-gradient-to-r from-[#44BCFF] via-[#FF44EC] to-[#FF675E] inline-block text-transparent bg-clip-text">
-                      {results.is_duplicate ? 'Cached Result' : 'Scrape Result'}
-                    </span>
-                    {results.response?.grade && (
-                      <span className="px-2 py-0.5 text-sm rounded bg-[#44BCFF]/10 text-[#44BCFF] border border-[#44BCFF]/30 ml-auto">
-                        Grade: {results.response.grade}
-                      </span>
-                    )}
-                  </h3>
-                  {results.message && (
-                    <p className="text-yellow-400 mb-4 italic">
-                      {results.message}
-                    </p>
-                  )}
-                  <p className="text-white/80 mb-4">{results.response?.summary}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {results.response?.tags.map((tag, i) => (
-                      <span key={i} className="px-3 py-1 rounded-full text-sm 
-                                           bg-[#FF44EC]/10 text-[#FF44EC] 
-                                           border border-[#FF44EC]/30">
-                        #{tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+              )}
+              <div className="mt-2">
+                {results.tags.map((tag, i) => (
+                  <span key={i} className="mr-2 px-2 py-1 bg-gray-200 rounded">
+                    #{tag}
+                  </span>
+                ))}
               </div>
-            )}
-          </div>
-        )}
-      </div>
+              {results.is_duplicate && (
+                <div className="mt-2 text-gray-600">
+                  (Retrieved from cache)
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

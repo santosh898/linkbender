@@ -55,6 +55,9 @@ watchfiles = "^0.24.0"
 websockets = "^13.1"
 pymongo = "^4.10.1"
 
+[tool.poetry.scripts]
+dev = "uvicorn index:app --reload"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
