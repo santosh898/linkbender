@@ -16,9 +16,28 @@ function App() {
         const data = await response.json();
         setResults(data);
       } else {
-        const response = await fetch(`http://localhost:8000/scrape?link=${input}`);
-        const data = await response.json();
-        setResults(data);
+        // First, check if URL exists
+        const checkResponse = await fetch(`http://localhost:8000/check-url?url=${encodeURIComponent(input)}`);
+        const checkData = await checkResponse.json();
+
+        if (checkData.exists) {
+          // If URL exists, fetch the cached data
+          const response = await fetch(`http://localhost:8000/get-cached?url=${encodeURIComponent(input)}`);
+          const data = await response.json();
+          setResults({
+            ...data,
+            is_duplicate: true,
+            message: checkData.message
+          });
+        } else {
+          // If URL doesn't exist, proceed with scraping
+          const response = await fetch(`http://localhost:8000/scrape?link=${encodeURIComponent(input)}`);
+          const data = await response.json();
+          setResults({
+            ...data,
+            is_duplicate: false
+          });
+        }
       }
     } catch (error) {
       console.error(error);
@@ -132,8 +151,13 @@ function App() {
                 </div>
                 <div className="relative">
                   <h3 className="text-2xl font-bold bg-gradient-to-r from-[#44BCFF] via-[#FF44EC] to-[#FF675E] inline-block text-transparent bg-clip-text mb-4">
-                    Scrape Result
+                    {results.is_duplicate ? 'Cached Result' : 'Scrape Result'}
                   </h3>
+                  {results.message && (
+                    <p className="text-yellow-400 mb-4 italic">
+                      {results.message}
+                    </p>
+                  )}
                   <p className="text-white/80 mb-4">{results.response?.summary}</p>
                   <div className="flex flex-wrap gap-2">
                     {results.response?.tags.map((tag, i) => (

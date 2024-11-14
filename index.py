@@ -8,7 +8,7 @@ import json
 from phi.agent import Agent
 from phi.model.xai import xAI
 from pymongo import MongoClient
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlparse, urljoin
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -51,8 +51,28 @@ collection = db['scrapes']
 tags_collection = db['tags']
 
 @app.get("/scrape")
-async def scrape(link: str):
+async def scrape(link: str, force: bool = False):
     try:
+        # Normalize the URL
+        parsed_url = urlparse(link)
+        normalized_url = urljoin(link, parsed_url.path)
+        
+        # Check if URL exists and force is not enabled
+        if not force:
+            existing_doc = collection.find_one({'url': normalized_url})
+            if existing_doc:
+                return {
+                    "text": existing_doc.get('content', '')[:500],
+                    "status": "cached",
+                    "response": {
+                        "summary": existing_doc.get('summary'),
+                        "tags": existing_doc.get('tags', [])
+                    },
+                    "new_tags": [],
+                    "message": f"This URL was previously scraped on {existing_doc.get('timestamp').strftime('%Y-%m-%d %H:%M:%S')}",
+                    "is_duplicate": True
+                }
+
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
@@ -117,7 +137,7 @@ async def scrape(link: str):
             
             # Store in MongoDB with normalized tags
             mongo_doc = {
-                'url': link,
+                'url': normalized_url,
                 'summary': response_data['summary'],
                 'tags': [tag.lower().strip() for tag in response_data['tags']],
                 'timestamp': datetime.now(),
@@ -232,3 +252,46 @@ async def search_by_tags(tags: str):
             "status": "error",
             "error": str(e)
         }
+
+@app.get("/check-url")
+async def check_url(url: str):
+    try:
+        # Normalize the URL
+        parsed_url = urlparse(url)
+        normalized_url = urljoin(url, parsed_url.path)
+        
+        # Check if URL exists in database
+        existing_doc = collection.find_one({'url': normalized_url})
+        
+        if existing_doc:
+            return {
+                "exists": True,
+                "message": f"This URL was previously scraped on {existing_doc.get('timestamp').strftime('%Y-%m-%d %H:%M:%S')}"
+            }
+        return {"exists": False}
+    except Exception as e:
+        return {"error": str(e), "status": "error"}
+
+@app.get("/get-cached")
+async def get_cached(url: str):
+    try:
+        # Normalize the URL
+        parsed_url = urlparse(url)
+        normalized_url = urljoin(url, parsed_url.path)
+        
+        # Get cached data
+        doc = collection.find_one({'url': normalized_url})
+        
+        if doc:
+            return {
+                "response": {
+                    "summary": doc.get('summary'),
+                    "tags": doc.get('tags', [])
+                },
+                "text": doc.get('content', '')[:500],
+                "status": "cached",
+                "message": f"Retrieved from cache (scraped on {doc.get('timestamp').strftime('%Y-%m-%d %H:%M:%S')})"
+            }
+        return {"error": "Cached data not found", "status": "error"}
+    except Exception as e:
+        return {"error": str(e), "status": "error"}
