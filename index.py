@@ -43,7 +43,8 @@ def update_saved_tags(new_tags: list[str]) -> None:
 summary_agent = Agent(
     name="summary_agent",
     model=xAI(id="grok-beta"),
-    show_tool_calls=True,
+    show_tool_calls=False,
+    structured_output=True,
     tools=[get_saved_tags],
     instructions=["""
     You will receive a text to analyze.
@@ -104,8 +105,6 @@ async def scrape(link: str):
                 raise ValueError(f"Unexpected response type: {type(agent_response.content)}")
         except Exception as e:
             return {"error": str(e), "status": "error"}
-        
-        print(agent_response)
         
         try:
                     # Store in MongoDB
