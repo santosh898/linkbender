@@ -3,3 +3,4 @@ __pycache__/
 .env
 .venv
 scrape_db.json 
+.DS_Store
