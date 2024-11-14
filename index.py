@@ -32,8 +32,8 @@ app = FastAPI()
 # MongoDB setup
 username = quote_plus("chanakyabevera")
 password = quote_plus("Chanu@07041997")
-connection_string = f"mongodb+srv://{username}:{password}@clusterme.81rw1.mongodb.net/?retryWrites=true&w=majority"
-client = MongoClient(connection_string)
+connection_string = f"mongodb+srv://{username}:{password}@clusterme.81rw1.mongodb.net/?retryWrites=true&w=majority&appName=ClusterMe"
+client = MongoClient(connection_string, connect=False)
 db = client['scraping_db']
 collection = db['scrapes']
 
@@ -55,13 +55,26 @@ async def scrape(link: str):
         
         # Simplified agent response handling
         agent_response = summary_agent.run(text)
-        response_data = agent_response.content if isinstance(agent_response.content, dict) else json.loads(agent_response.content)
+        try:
+            if isinstance(agent_response.content, dict):
+                response_dict = agent_response.content
+            elif isinstance(agent_response.content, str):
+                # Remove any potential markdown formatting or extra whitespace
+                cleaned_content = agent_response.content.strip()
+                if cleaned_content.startswith('```json'):
+                    # Remove markdown code blocks if present
+                    cleaned_content = cleaned_content.replace('```json', '').replace('```', '').strip()
+                response_dict = json.loads(cleaned_content)
+            else:
+                raise ValueError(f"Unexpected response type: {type(agent_response.content)}")
+        except Exception as e:
+            return {"error": str(e), "status": "error"}
         
         # Store in MongoDB
         mongo_doc = {
             'url': link,
-            'summary': response_data['summary'],
-            'tags': response_data['tags'],
+            'summary': response_dict['summary'],
+            'tags': response_dict['tags'],
             'timestamp': datetime.now(),
             'content': text[:1000]
         }
@@ -70,7 +83,7 @@ async def scrape(link: str):
         return {
             "text": text[:500],
             "status": "success",
-            "response": response_data
+            "response": response_dict
         }
             
     except Exception as e:
