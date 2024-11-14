@@ -180,3 +180,45 @@ async def test_db():
 async def get_tags():
     tags_list = list(tags_collection.find({}, {'_id': 0}))
     return {"tags": tags_list}
+
+@app.get("/search-by-tags")
+async def search_by_tags(tags: str):
+    try:
+        # Split tags string into list and normalize them
+        tag_list = [tag.strip().lower() for tag in tags.split(',')]
+        
+        # Find documents that contain ANY of the provided tags
+        query = {'tags': {'$in': tag_list}}
+        
+        # Get matching documents, limit to 4, sort by timestamp (newest first)
+        results = list(collection.find(
+            query,
+            {
+                '_id': 0,
+                'url': 1,
+                'summary': 1,
+                'tags': 1,
+                'content': {'$substr': ['$content', 0, 200]},  # First 200 chars as preview
+                'timestamp': 1
+            }
+        ).sort('timestamp', -1).limit(4))
+        
+        # Get related tags (tags that appear together with search results)
+        related_tags = set()
+        for doc in results:
+            related_tags.update(doc.get('tags', []))
+        related_tags.difference_update(tag_list)  # Remove search tags
+        
+        return {
+            "status": "success",
+            "results": results,
+            "count": len(results),
+            "searched_tags": tag_list,
+            "related_tags": list(related_tags)[:5]  # Suggest up to 5 related tags
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
+        }
