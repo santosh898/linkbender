@@ -885,13 +885,13 @@ numpy = "*"
 
 [[package]]
 name = "phidata"
-version = "2.5.30"
+version = "2.5.31"
 description = "Build AI Agents with memory, knowledge and tools."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "phidata-2.5.30-py3-none-any.whl", hash = "sha256:9d59810c12d74d0868c9aa2c73f9b4c4b2a175b46ebc70c6df102d0482a3277b"},
-    {file = "phidata-2.5.30.tar.gz", hash = "sha256:8f4c793be158faa2389c01671f107ce67cdcef80f2593f916fb53d421d153213"},
+    {file = "phidata-2.5.31-py3-none-any.whl", hash = "sha256:8a5927b31ddca2a9975fc425924da41612616d77d1041b2124f46edc274595a6"},
+    {file = "phidata-2.5.31.tar.gz", hash = "sha256:feeb3604ed3b70a8321cdfe89ccd1c67eddc1218f3ae0ff47226bffe77ef4639"},
 ]
 
 [package.dependencies]
