@@ -93,7 +93,7 @@ async def scrape(url: str):
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
 
-        response = requests.get(link, headers=headers)
+        response = requests.get(url, headers=headers)
         response.raise_for_status()
 
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -156,7 +156,7 @@ async def scrape(url: str):
 
             # Store in MongoDB with normalized tags
             mongo_doc = {
-                'url': normalized_url,
+                'url': url,
                 'summary': response_data['summary'],
                 'tags': [tag.lower().strip() for tag in response_data['tags']],
                 'grade': response_data['grade'],
@@ -207,7 +207,7 @@ async def scrape(url: str):
             "error": str(e),
             "text": text[:500] if text else "",
             "response": {
-                "summary": str(agent_response.content)[:200] if agent_response else "Error occurred",
+                "summary": "none",
                 "tags": ["error"],
                 "grade": "0",
                 "badge": "none"
