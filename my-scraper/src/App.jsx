@@ -20,7 +20,7 @@ function App() {
 
   const toggleDarkMode = () => setDarkMode(!darkMode);
 
-  const BACKEND_URL = process.env.BACKEND_URL;
+  const BACKEND_URL = process.env.VITE_BACKEND_URL;
 
   // STEP 1: URL CHECK FUNCTION
   const checkUrl = async (url) => {
