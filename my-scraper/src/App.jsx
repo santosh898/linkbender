@@ -176,21 +176,35 @@ function App() {
           <input
             type="text"
             value={input}
-            onChange={handleInputChange}
+            onChange={(e) => setInput(e.target.value)}
             placeholder={isSearchMode ? 'Enter tags to search' : 'Enter URL to scrape'}
             className="flex-1 px-4 py-3 bg-white text-black 
                      border-2 border-black rounded 
                      placeholder-gray-600 font-medium"
           />
-          <button  
-            type="submit" 
-            className="relative inline-block w-full rounded border-2 border-black bg-black px-8 py-3 
-                     text-base font-bold text-white transition duration-100 
-                     hover:bg-gray-900 hover:text-yellow-500 disabled:opacity-50 
-                     disabled:cursor-not-allowed disabled:hover:bg-black disabled:hover:text-white"
+          <button
+            type="submit"
             disabled={loading || !input.trim()}
+            className="relative"
           >
-            {loading ? 'Processing...' : (isSearchMode ? 'Search' : 'Scrape')}
+            <span className="absolute top-0 left-0 mt-1 ml-1 h-full w-full rounded bg-gray-700"></span>
+            <span className={`fold-bold relative inline-block h-full w-full rounded border-2 
+                           border-black bg-black px-8 py-3 text-base font-bold text-white 
+                           transition duration-100 hover:bg-gray-900 hover:text-yellow-500
+                           ${(loading || !input.trim()) ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {loading ? (
+                <div className="flex items-center gap-2 justify-center">
+                  <div className="relative w-4 h-4">
+                    <div className="absolute top-0 left-0 mt-0.5 ml-0.5 h-full w-full rounded-full bg-gray-700"></div>
+                    <div className="relative w-full h-full border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                  Processing...
+                </div>
+              ) : (
+                isSearchMode ? 'Search' : 'Scrape'
+              )}
+            </span>
           </button>
         </div>
       </form>
@@ -209,21 +223,26 @@ function App() {
             // Search Results Display
             <div className="space-y-4">
               <div className="mb-4">
-                <h3 className="text-lg font-bold">
+                <h3 className="text-lg font-bold text-black">
                   Found {results.searchResults.length} results
                 </h3>
                 {results.searchResults.map((result) => (
                   <div key={result.id} className="mb-4 p-4 bg-white rounded border-2 border-black">
-                    <h4 className="font-bold">{result.url}</h4>
+                    <h4 className="font-bold text-black">{result.url}</h4>
                     <p className="text-gray-700">{result.summary}</p>
                     <div className="mt-2">
-                      <span className="font-bold mr-4">Grade: {result.grade}</span>
-                      <span className="font-bold">Badge: {result.badge}</span>
+                      <span className="font-bold text-black mr-4">Grade: {result.grade}</span>
+                      <span className="font-bold text-black">Badge: {result.badge}</span>
                     </div>
                     <div className="mt-2">
                       {result.tags.map((tag, i) => (
-                        <span key={i} className="mr-2 px-2 py-1 bg-gray-200 rounded">
-                          #{tag}
+                        <span key={i} className="relative mr-2 mb-2 inline-block">
+                          <span className="absolute top-0 left-0 mt-1 ml-1 h-full w-full rounded bg-gray-700"></span>
+                          <span className="fold-bold relative inline-block h-full w-full rounded border-2 
+                                         border-black bg-black px-3 py-1 text-base font-bold text-white 
+                                         transition duration-100 hover:bg-gray-900 hover:text-yellow-500">
+                            #{tag}
+                          </span>
                         </span>
                       ))}
                     </div>
@@ -237,17 +256,23 @@ function App() {
           ) : (
             // Scrape Results Display
             <div className="p-4 bg-white rounded border-2 border-black">
-              <h3 className="font-bold">{results.url}</h3>
+              <h3 className="font-bold text-black">{results.url}</h3>
               <p className="text-gray-700 mt-2">{results.summary}</p>
-              {results.grade && (
+              {(results.grade || results.badge) && (
                 <div className="mt-2">
-                  <span className="font-bold">Grade: {results.grade}</span>
+                  <span className="font-bold text-black mr-4">Grade: {results.grade}</span>
+                  <span className="font-bold text-black">Badge: {results.badge}</span>
                 </div>
               )}
               <div className="mt-2">
                 {results.tags.map((tag, i) => (
-                  <span key={i} className="mr-2 px-2 py-1 bg-gray-200 rounded">
-                    #{tag}
+                  <span key={i} className="relative mr-2 mb-2 inline-block">
+                    <span className="absolute top-0 left-0 mt-1 ml-1 h-full w-full rounded bg-gray-700"></span>
+                    <span className="fold-bold relative inline-block h-full w-full rounded border-2 
+                                     border-black bg-black px-3 py-1 text-base font-bold text-white 
+                                     transition duration-100 hover:bg-gray-900 hover:text-yellow-500">
+                      #{tag}
+                    </span>
                   </span>
                 ))}
               </div>
