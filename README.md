@@ -1,6 +1,6 @@
 # RAG with PHI
 
-## Start PGVector Database
+## Start PGVector Database - Optional - For Future Use
 
 1. Start the PGVector database using Docker Compose:
 
@@ -10,7 +10,7 @@
 
    You should see the `pgvector` container running on port 5532.
 
-## Start Ollama and pull required models
+## Start Ollama and pull required models - Optional - For Future Use
 
 ```sh
 # Start Ollama (if not already running)
