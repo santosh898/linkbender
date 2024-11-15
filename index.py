@@ -1,6 +1,6 @@
 # fast api server with a get endpoint to take a link and scrape the text from the page
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -11,6 +11,7 @@ from pymongo import MongoClient
 from urllib.parse import quote_plus, urlparse, urljoin
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 import aiohttp
 
 load_dotenv()
@@ -304,3 +305,17 @@ async def get_cached(url: str):
             "status": "error",
             "error": f"Failed to retrieve cached data: {str(e)}"
         }
+
+@app.get("/", response_class=HTMLResponse)
+async def read_items():
+    return """
+    <html>
+        <head>
+            <title>Linkbender</title>
+        </head>
+        <body>
+            <h1></h1>
+            <a href="/docs">Docs</a>
+        </body>
+    </html>
+    """
