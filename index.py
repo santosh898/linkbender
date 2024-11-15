@@ -14,7 +14,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
-# Simplified agent setup with clearer instructions
 summary_agent = Agent(
     model=xAI(id="grok-beta"),
     show_tool_calls=True,
