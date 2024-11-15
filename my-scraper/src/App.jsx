@@ -273,14 +273,13 @@ function App() {
                   shadow-[0_3px_0]
                   ${
                     darkMode
-                      ? `translate-x-[${
-                          isSearchMode ? "30px" : "0px"
-                        }] border-yellow-300 bg-dark-card shadow-yellow-300`
-                      : `translate-x-[${
-                          isSearchMode ? "30px" : "0px"
-                        }] border-black bg-white shadow-black`
+                      ? "border-yellow-300 bg-dark-card shadow-yellow-300"
+                      : "border-black bg-white shadow-black"
                   }
                 `}
+                  style={{
+                    transform: `translateX(${isSearchMode ? "30px" : "0px"})`,
+                  }}
                 />
               </div>
             </label>
