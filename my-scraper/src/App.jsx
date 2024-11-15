@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 function App() {
   const [isSearchMode, setIsSearchMode] = useState(false);
@@ -6,6 +6,17 @@ function App() {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem('darkMode') === 'true' || 
+           window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('darkMode', darkMode);
+    document.documentElement.classList.toggle('dark', darkMode);
+  }, [darkMode]);
+
+  const toggleDarkMode = () => setDarkMode(!darkMode);
 
   // STEP 1: URL CHECK FUNCTION
   const checkUrl = async (url) => {
@@ -183,131 +194,202 @@ function App() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      {/* Mode Toggle */}
-      <div className="mb-8 text-center">
-        <div className="flex flex-col items-center">
-          <label className="relative inline-block cursor-pointer mb-2">
-            <input 
-              type="checkbox" 
-              checked={isSearchMode}
-              onChange={(e) => handleModeChange(e.target.checked)}
-              className="sr-only" 
-            />
-            <div className="relative">
-              <span className="absolute top-0 left-0 mt-0.5 ml-0.5 h-full w-full rounded-full bg-gray-700"></span>
-              <div className="relative h-8 w-16 rounded-full border-2 border-black bg-white transition-colors duration-200 ease-in-out">
-                <div className={`absolute top-1 ${isSearchMode ? 'left-8' : 'left-1'} h-5 w-5 rounded-full border-2 border-black bg-black transition-all duration-200 ease-in-out`}></div>
-              </div>
-            </div>
-          </label>
-          <span className="text-sm font-bold text-white">
-            {isSearchMode ? 'Search Mode' : 'Scrape Mode'}
-          </span>
-        </div>
-      </div>
-
-      {/* Input Form */}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="relative flex gap-2">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={isSearchMode ? 'Enter tags to search' : 'Enter URL to scrape'}
-            className="flex-1 px-4 py-3 bg-white text-black 
-                     border-2 border-black rounded 
-                     placeholder-gray-600 font-medium"
-          />
+    <div className={`min-h-screen transition-colors duration-200
+                    ${darkMode ? 'bg-dark-bg text-white' : 'bg-gray-100 text-black'}`}>
+      <div className="p-8">
+        {/* Dark Mode Toggle - Simpler version */}
+        <div className="fixed top-4 right-4">
           <button
-            type="submit"
-            disabled={loading || !input.trim()}
-            className="relative"
+            onClick={toggleDarkMode}
+            className={`p-2 rounded-lg transition-all duration-300
+                      ${darkMode 
+                        ? 'text-yellow-300 hover:text-yellow-400' 
+                        : 'text-gray-800 hover:text-yellow-500'}`}
+            title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
-            <span className="absolute top-0 left-0 mt-1 ml-1 h-full w-full rounded bg-gray-700"></span>
-            <span className={`fold-bold relative inline-block h-full w-full rounded border-2 
-                           border-black bg-black px-8 py-3 text-base font-bold text-white 
-                           transition duration-100 hover:bg-gray-900 hover:text-yellow-500
-                           ${(loading || !input.trim()) ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {loading ? (
-                <div className="flex items-center gap-2 justify-center">
-                  <div className="relative w-4 h-4">
-                    <div className="absolute top-0 left-0 mt-0.5 ml-0.5 h-full w-full rounded-full bg-gray-700"></div>
-                    <div className="relative w-full h-full border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  </div>
-                  Processing...
-                </div>
-              ) : (
-                isSearchMode ? 'Search' : 'Scrape'
-              )}
-            </span>
+            {darkMode ? '🌙' : '☀️'}
           </button>
         </div>
-      </form>
 
-      {/* Error Display */}
-      {error && (
-        <div className="mt-4 p-4 bg-red-100 border-2 border-red-500 rounded text-red-700">
-          {error}
+        {/* Search/Scrape Mode Toggle */}
+        <div className="mb-8 text-center">
+          <div className="flex flex-col items-center">
+            <label className="relative inline-block w-[50px] h-[20px] cursor-pointer">
+              <input 
+                type="checkbox"
+                checked={isSearchMode}
+                onChange={(e) => handleModeChange(e.target.checked)}
+                className="sr-only peer"
+              />
+              {/* Main toggle track */}
+              <div className={`
+                absolute inset-0 
+                transition-all duration-300 
+                rounded-[5px] border-2
+                shadow-[4px_4px_0_0]
+                ${darkMode 
+                  ? 'bg-dark-card border-yellow-300 shadow-yellow-300' 
+                  : 'bg-white border-black shadow-black'}
+              `}>
+                {/* Toggle knob */}
+                <div className={`
+                  absolute h-[20px] w-[20px] 
+                  transition-all duration-300 
+                  rounded-[5px] border-2
+                  -top-0.5 -left-0.5
+                  shadow-[0_3px_0]
+                  ${darkMode 
+                    ? `translate-x-[${isSearchMode ? '30px' : '0px'}] border-yellow-300 bg-dark-card shadow-yellow-300` 
+                    : `translate-x-[${isSearchMode ? '30px' : '0px'}] border-black bg-white shadow-black`}
+                `}/>
+              </div>
+            </label>
+            {/* Mode Label */}
+            <span className={`mt-2 text-sm font-bold
+                   ${darkMode ? 'text-yellow-300' : 'text-black'}`}>
+              {isSearchMode ? 'Search Mode' : 'Scrape Mode'}
+            </span>
+          </div>
         </div>
-      )}
 
-      {/* Results Display */}
-      {results && !loading && (
-        <div className="mt-8">
-          {results.isSearch ? (
-            // Search Results Display
-            <div className="space-y-4">
-              <div className="mb-4">
-                <h3 className="text-lg font-bold text-black">
-                  Found {results.searchResults.length} results
-                </h3>
-                {results.searchResults.map((result) => (
-                  <div key={result.id} className="mb-4 p-4 bg-white rounded border-2 border-black">
-                    <h4 className="font-bold text-black">{result.url}</h4>
-                    <p className="text-gray-700">{result.summary}</p>
-                    <div className="mt-2">
-                      <span className="font-bold text-black mr-4">Grade: {result.grade}</span>
-                      <span className="font-bold text-black">Badge: {result.badge}</span>
-                    </div>
-                    <div className="mt-2">
-                      {result.tags.map((tag) => (
-                        <TagDisplay key={tag} tag={tag} />
-                      ))}
-                    </div>
-                    <div className="mt-2 text-sm text-gray-500">
-                      Added: {new Date(result.timestamp).toLocaleDateString()}
-                    </div>
+        {/* Input Form with optimized dark mode */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="relative flex gap-2">
+            {/* Input field */}
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={isSearchMode ? 'Enter tags to search' : 'Enter URL to scrape'}
+              className={`flex-1 px-4 py-3 rounded border-2 transition-all duration-300
+                        ${darkMode 
+                          ? 'bg-dark-card border-yellow-300 text-yellow-300 placeholder-yellow-300/50 focus:shadow-yellow' 
+                          : 'bg-white border-black text-black placeholder-gray-600'} 
+                        font-medium focus:outline-none`}
+            />
+
+            {/* Search/Scrape Button */}
+            <button
+              type="submit"
+              disabled={loading || !input.trim()}
+              className="relative"
+            >
+              <span className="absolute top-0 left-0 mt-1 ml-1 h-full w-full rounded bg-gray-700/50"></span>
+              <span className={`fold-bold relative inline-block h-full w-full rounded border-2 
+                             px-8 py-3 text-base font-bold transition-all duration-300
+                             ${darkMode 
+                               ? 'border-yellow-300 bg-dark-card text-yellow-300 hover:bg-dark-border hover:shadow-yellow' 
+                               : 'border-black bg-black text-white hover:bg-gray-900 hover:text-yellow-500'}
+                             ${(loading || !input.trim()) 
+                               ? 'opacity-50 cursor-not-allowed' 
+                               : 'hover:scale-105'}`}>
+                {loading ? (
+                  <div className="flex items-center">
+                    <svg className={`animate-spin -ml-1 mr-3 h-5 w-5 
+                                 ${darkMode ? 'text-yellow-300' : 'text-white'}`} 
+                         xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" 
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                      </path>
+                    </svg>
+                    Processing...
                   </div>
-                ))}
+                ) : (
+                  isSearchMode ? 'Search' : 'Scrape'
+                )}
+              </span>
+            </button>
+          </div>
+        </form>
+
+        {/* Error Display */}
+        {error && (
+          <div className="mt-4 p-4 bg-red-100 border-2 border-red-500 rounded text-red-700">
+            {error}
+          </div>
+        )}
+
+        {/* Results Display - Update styles */}
+        {results && !loading && (
+          <div className="mt-8">
+            {results.isSearch ? (
+              // Search Results Display
+              <div className="space-y-4">
+                <div className="mb-4">
+                  <h3 className="text-lg font-bold text-black">
+                    Found {results.searchResults.length} results
+                  </h3>
+                  {results.searchResults.map((result) => (
+                    <div key={result.id} className={`mb-4 p-4 rounded border-2 transition-all duration-300
+                                                 ${darkMode 
+                                                   ? 'bg-dark-card border-yellow-300 shadow-yellow' 
+                                                   : 'bg-white border-black'}`}>
+                      <h4 className={`font-bold ${darkMode ? 'text-yellow-300' : 'text-black'}`}>
+                        {result.url}
+                      </h4>
+                      <p className={darkMode ? 'text-gray-300' : 'text-gray-700'}>
+                        {result.summary}
+                      </p>
+                      <div className="mt-2">
+                        <span className={`font-bold mr-4 ${darkMode ? 'text-yellow-300' : 'text-black'}`}>
+                          Grade: {result.grade}
+                        </span>
+                        <span className={`font-bold ${darkMode ? 'text-yellow-300' : 'text-black'}`}>
+                          Badge: {result.badge}
+                        </span>
+                      </div>
+                      <div className="mt-2">
+                        {result.tags.map((tag) => (
+                          <span key={tag} className="relative mr-2 mb-2 inline-block cursor-pointer" 
+                                onClick={() => handleTagClick(tag)}>
+                            <span className="absolute top-0 left-0 mt-1 ml-1 h-full w-full rounded bg-gray-700/50"></span>
+                            <span className={`fold-bold relative inline-block h-full w-full rounded border-2 
+                                           px-3 py-1 text-base font-bold transition-all duration-300
+                                           ${darkMode 
+                                             ? 'border-yellow-300 bg-dark-card text-yellow-300 hover:bg-dark-border' 
+                                             : 'border-black bg-black text-white hover:bg-gray-900 hover:text-yellow-500'}`}>
+                              #{tag}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                      <div className={`mt-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Added: {new Date(result.timestamp).toLocaleDateString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          ) : (
-            // Scrape Results Display
-            <div className="p-4 bg-white rounded border-2 border-black">
-              <h3 className="font-bold text-black">{results.url}</h3>
-              <p className="text-gray-700 mt-2">{results.summary}</p>
-              {(results.grade || results.badge) && (
+            ) : (
+              // Scrape Results Display
+              <div className={`p-4 rounded border-2
+                           ${darkMode 
+                             ? 'bg-dark-card border-dark-border' 
+                             : 'bg-white border-black'}`}>
+                <h3 className="font-bold text-black">{results.url}</h3>
+                <p className="text-gray-700 mt-2">{results.summary}</p>
+                {(results.grade || results.badge) && (
+                  <div className="mt-2">
+                    <span className="font-bold text-black mr-4">Grade: {results.grade}</span>
+                    <span className="font-bold text-black">Badge: {results.badge}</span>
+                  </div>
+                )}
                 <div className="mt-2">
-                  <span className="font-bold text-black mr-4">Grade: {results.grade}</span>
-                  <span className="font-bold text-black">Badge: {results.badge}</span>
+                  {results.tags.map((tag) => (
+                    <TagDisplay key={tag} tag={tag} />
+                  ))}
                 </div>
-              )}
-              <div className="mt-2">
-                {results.tags.map((tag) => (
-                  <TagDisplay key={tag} tag={tag} />
-                ))}
+                {results.is_duplicate && (
+                  <div className="mt-2 text-gray-600">
+                    (Retrieved from cache)
+                  </div>
+                )}
               </div>
-              {results.is_duplicate && (
-                <div className="mt-2 text-gray-600">
-                  (Retrieved from cache)
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
