@@ -5,8 +5,8 @@
 @layer base {
   body {
     font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-    background-color: theme('colors.cyber.dark');
-    color: theme('colors.cyber.primary');
+    background-color: theme("colors.cyber.dark");
+    color: theme("colors.cyber.primary");
   }
 }
 
@@ -14,65 +14,53 @@
   .cyber-button {
     @apply bg-transparent border rounded px-4 py-2 font-medium cursor-pointer
            transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed;
-    border-color: theme('colors.cyber.primary');
-    color: theme('colors.cyber.primary');
-    box-shadow: theme('boxShadow.cyber');
+    border-color: theme("colors.cyber.primary");
+    color: theme("colors.cyber.primary");
+    box-shadow: theme("boxShadow.cyber");
   }
 
   .cyber-button:hover {
-    border-color: theme('colors.cyber.secondary');
-    color: theme('colors.cyber.secondary');
-    box-shadow: theme('boxShadow.cyber-hover');
+    border-color: theme("colors.cyber.secondary");
+    color: theme("colors.cyber.secondary");
+    box-shadow: theme("boxShadow.cyber-hover");
     transform: translateY(-2px);
   }
 
   .cyber-link {
     @apply font-semibold relative transition-colors duration-300;
-    color: theme('colors.cyber.tertiary');
-    text-shadow: 0 0 8px theme('colors.cyber.tertiary');
+    color: theme("colors.cyber.tertiary");
+    text-shadow: 0 0 8px theme("colors.cyber.tertiary");
   }
 
   .cyber-link:hover {
-    color: theme('colors.cyber.primary');
-    text-shadow: 0 0 12px theme('colors.cyber.primary');
+    color: theme("colors.cyber.primary");
+    text-shadow: 0 0 12px theme("colors.cyber.primary");
   }
 
   .cyber-heading {
     @apply text-5xl font-bold leading-tight tracking-tight;
-    color: theme('colors.cyber.primary');
-    text-shadow: 
-      2px 2px theme('colors.cyber.secondary'),
-      -2px -2px theme('colors.cyber.tertiary');
+    color: theme("colors.cyber.primary");
+    text-shadow: 2px 2px theme("colors.cyber.secondary"),
+      -2px -2px theme("colors.cyber.tertiary");
     animation: textFlicker 3s infinite;
   }
 
   .cyber-box {
-    background-color: theme('colors.cyber.darker');
-    border: 1px solid theme('colors.cyber.primary' / 50%);
+    background-color: theme("colors.cyber.darker");
+    border: 1px solid theme("colors.cyber.primary" / 50%);
     @apply rounded-lg p-6 backdrop-blur-sm relative;
-    box-shadow: theme('boxShadow.cyber-box');
+    box-shadow: theme("boxShadow.cyber-box");
   }
 }
 
 @keyframes scan {
-  0% {top:10px; }
-  50% { top:calc(100% - 10px); }
-  100% { top:10px; }
+  0% {
+    top: 10px;
+  }
+  50% {
+    top: calc(100% - 10px);
+  }
+  100% {
+    top: 10px;
+  }
 }
-
-.cyber-box::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(
-    90deg,
-    theme('colors.cyber.primary') 0%,
-    theme('colors.cyber.secondary') 50%,
-    theme('colors.cyber.tertiary') 100%
-  );
-  animation: scan 6s ease-in-out infinite;
-  opacity: 0.5;
-} 
