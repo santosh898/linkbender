@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 function App() {
   const [isSearchMode, setIsSearchMode] = useState(false);
@@ -6,6 +6,17 @@ function App() {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem('darkMode') === 'true' || 
+           window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('darkMode', darkMode);
+    document.documentElement.classList.toggle('dark', darkMode);
+  }, [darkMode]);
+
+  const toggleDarkMode = () => setDarkMode(!darkMode);
 
   // STEP 1: URL CHECK FUNCTION
   const checkUrl = async (url) => {
@@ -37,12 +48,21 @@ function App() {
   const scrapeNewUrl = async (url) => {
     try {
       const response = await fetch(`http://localhost:8000/scrape?url=${encodeURIComponent(url)}`);
-      if (!response.ok) throw new Error('Failed to scrape URL');
       const data = await response.json();
-      console.log('Scraped Data:', data); // Debug log
+      console.log('Scrape response:', data); // Debug log
+
+      if (!response.ok || data.status === 'error') {
+        throw new Error(data.error || 'Failed to scrape URL');
+      }
+      
       return data;
     } catch (error) {
-      throw new Error(`Scraping failed: ${error.message}`);
+      console.error('Scraping error:', error);
+      if (error.response) {
+        const errorData = await error.response.json();
+        throw new Error(errorData.error || 'Failed to scrape URL');
+      }
+      throw error;
     }
   };
 
@@ -60,7 +80,7 @@ function App() {
   };
 
   // MAIN SUBMISSION HANDLER
-  const handleSubmit = async (e) => {
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     const trimmedInput = input.trim();
     if (!trimmedInput) return;
@@ -71,11 +91,9 @@ function App() {
 
     try {
       if (isSearchMode) {
-        // SEARCH MODE FLOW
         console.log('Starting search for tags:', trimmedInput);
         const searchData = await searchByTags(trimmedInput);
         
-        // Map the DB structure directly to results
         setResults({
           searchResults: searchData.results.map(result => ({
             id: result._id,
@@ -93,34 +111,40 @@ function App() {
         // SCRAPE MODE FLOW
         console.log('Starting scrape for URL:', trimmedInput);
         
-        // 1. Validate URL format
         try {
           new URL(trimmedInput);
         } catch {
           throw new Error('Please enter a valid URL');
         }
 
-        // 2. Check if URL exists
+        // Check if URL exists
         console.log('Checking URL existence...');
         const urlCheck = await checkUrl(trimmedInput);
         
-        // 3. Get data based on URL check
+        // Get data based on URL check
         console.log('URL exists:', urlCheck.exists);
-        const data = urlCheck.exists 
-          ? await getCachedData(trimmedInput)
-          : await scrapeNewUrl(trimmedInput);
-
-        // 4. Process and set results
-        console.log('Processing final data:', data);
-        setResults({
-          url: trimmedInput,
-          summary: data.response.summary,
-          grade: data.response.grade,
-          tags: data.response.tags,
-          is_duplicate: urlCheck.exists,
-          message: data.message,
-          isSearch: false
-        });
+        let data;
+        try {
+          data = urlCheck.exists 
+            ? await getCachedData(trimmedInput)
+            : await scrapeNewUrl(trimmedInput);
+          
+          console.log('Processing final data:', data);
+          
+          setResults({
+            url: trimmedInput,
+            summary: data.response.summary,
+            grade: data.response.grade,
+            badge: data.response.badge,
+            tags: data.response.tags,
+            is_duplicate: urlCheck.exists,
+            message: data.message,
+            isSearch: false
+          });
+        } catch (scrapeError) {
+          console.error('Scraping/Cache error:', scrapeError);
+          throw new Error(`Failed to process URL: ${scrapeError.message}`);
+        }
       }
     } catch (err) {
       console.error('Error in submission:', err);
@@ -128,7 +152,7 @@ function App() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [input, isSearchMode]);
 
   // MODE SWITCH HANDLER
   const handleModeChange = useCallback((checked) => {
@@ -145,121 +169,227 @@ function App() {
     setError(null);
   }, []);
 
-  return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      {/* Mode Toggle */}
-      <div className="mb-8 text-center">
-        <div className="flex flex-col items-center">
-          <label className="relative inline-block cursor-pointer mb-2">
-            <input 
-              type="checkbox" 
-              checked={isSearchMode}
-              onChange={(e) => handleModeChange(e.target.checked)}
-              className="sr-only" 
-            />
-            <div className="relative">
-              <span className="absolute top-0 left-0 mt-0.5 ml-0.5 h-full w-full rounded-full bg-gray-700"></span>
-              <div className="relative h-8 w-16 rounded-full border-2 border-black bg-white transition-colors duration-200 ease-in-out">
-                <div className={`absolute top-1 ${isSearchMode ? 'left-8' : 'left-1'} h-5 w-5 rounded-full border-2 border-black bg-black transition-all duration-200 ease-in-out`}></div>
-              </div>
-            </div>
-          </label>
-          <span className="text-sm font-bold text-white">
-            {isSearchMode ? 'Search Mode' : 'Scrape Mode'}
-          </span>
-        </div>
-      </div>
+  // Add a new handler function near your other handlers
+  const handleTagClick = useCallback((tag) => {
+    setIsSearchMode(true);  // Switch to search mode
+    setInput(tag);         // Set the tag as input
+    handleSubmit(new Event('submit')); // Trigger search
+  }, [handleSubmit]);
 
-      {/* Input Form */}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="relative flex gap-2">
-          <input
-            type="text"
-            value={input}
-            onChange={handleInputChange}
-            placeholder={isSearchMode ? 'Enter tags to search' : 'Enter URL to scrape'}
-            className="flex-1 px-4 py-3 bg-white text-black 
-                     border-2 border-black rounded 
-                     placeholder-gray-600 font-medium"
-          />
-          <button  
-            type="submit" 
-            className="relative inline-block w-full rounded border-2 border-black bg-black px-8 py-3 
-                     text-base font-bold text-white transition duration-100 
-                     hover:bg-gray-900 hover:text-yellow-500 disabled:opacity-50 
-                     disabled:cursor-not-allowed disabled:hover:bg-black disabled:hover:text-white"
-            disabled={loading || !input.trim()}
+  // Update the tag display in both search results and scrape results
+  const TagDisplay = ({ tag }) => (
+    <span 
+      key={tag} 
+      className="relative mr-2 mb-2 inline-block cursor-pointer" 
+      onClick={() => handleTagClick(tag)}
+      title={`Click to search for #${tag}`}
+    >
+      <span className="absolute top-0 left-0 mt-1 ml-1 h-full w-full rounded bg-gray-700"></span>
+      <span className="fold-bold relative inline-block h-full w-full rounded border-2 
+                     border-black bg-black px-3 py-1 text-base font-bold text-white 
+                     transition duration-100 hover:bg-gray-900 hover:text-yellow-500">
+        #{tag}
+      </span>
+    </span>
+  );
+
+  return (
+    <div className={`min-h-screen transition-colors duration-200
+                    ${darkMode ? 'bg-dark-bg text-white' : 'bg-gray-100 text-black'}`}>
+      <div className="p-8">
+        {/* Dark Mode Toggle - Simpler version */}
+        <div className="fixed top-4 right-4">
+          <button
+            onClick={toggleDarkMode}
+            className={`p-2 rounded-lg transition-all duration-300
+                      ${darkMode 
+                        ? 'text-yellow-300 hover:text-yellow-400' 
+                        : 'text-gray-800 hover:text-yellow-500'}`}
+            title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
-            {loading ? 'Processing...' : (isSearchMode ? 'Search' : 'Scrape')}
+            {darkMode ? '🌙' : '☀️'}
           </button>
         </div>
-      </form>
 
-      {/* Error Display */}
-      {error && (
-        <div className="mt-4 p-4 bg-red-100 border-2 border-red-500 rounded text-red-700">
-          {error}
+        {/* Search/Scrape Mode Toggle */}
+        <div className="mb-8 text-center">
+          <div className="flex flex-col items-center">
+            <label className="relative inline-block w-[50px] h-[20px] cursor-pointer">
+              <input 
+                type="checkbox"
+                checked={isSearchMode}
+                onChange={(e) => handleModeChange(e.target.checked)}
+                className="sr-only peer"
+              />
+              {/* Main toggle track */}
+              <div className={`
+                absolute inset-0 
+                transition-all duration-300 
+                rounded-[5px] border-2
+                shadow-[4px_4px_0_0]
+                ${darkMode 
+                  ? 'bg-dark-card border-yellow-300 shadow-yellow-300' 
+                  : 'bg-white border-black shadow-black'}
+              `}>
+                {/* Toggle knob */}
+                <div className={`
+                  absolute h-[20px] w-[20px] 
+                  transition-all duration-300 
+                  rounded-[5px] border-2
+                  -top-0.5 -left-0.5
+                  shadow-[0_3px_0]
+                  ${darkMode 
+                    ? `translate-x-[${isSearchMode ? '30px' : '0px'}] border-yellow-300 bg-dark-card shadow-yellow-300` 
+                    : `translate-x-[${isSearchMode ? '30px' : '0px'}] border-black bg-white shadow-black`}
+                `}/>
+              </div>
+            </label>
+            {/* Mode Label */}
+            <span className={`mt-2 text-sm font-bold
+                   ${darkMode ? 'text-yellow-300' : 'text-black'}`}>
+              {isSearchMode ? 'Search Mode' : 'Scrape Mode'}
+            </span>
+          </div>
         </div>
-      )}
 
-      {/* Results Display */}
-      {results && !loading && (
-        <div className="mt-8">
-          {results.isSearch ? (
-            // Search Results Display
-            <div className="space-y-4">
-              <div className="mb-4">
-                <h3 className="text-lg font-bold">
-                  Found {results.searchResults.length} results
-                </h3>
-                {results.searchResults.map((result) => (
-                  <div key={result.id} className="mb-4 p-4 bg-white rounded border-2 border-black">
-                    <h4 className="font-bold">{result.url}</h4>
-                    <p className="text-gray-700">{result.summary}</p>
-                    <div className="mt-2">
-                      <span className="font-bold mr-4">Grade: {result.grade}</span>
-                      <span className="font-bold">Badge: {result.badge}</span>
-                    </div>
-                    <div className="mt-2">
-                      {result.tags.map((tag, i) => (
-                        <span key={i} className="mr-2 px-2 py-1 bg-gray-200 rounded">
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="mt-2 text-sm text-gray-500">
-                      Added: {new Date(result.timestamp).toLocaleDateString()}
-                    </div>
+        {/* Input Form with optimized dark mode */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="relative flex gap-2">
+            {/* Input field */}
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={isSearchMode ? 'Enter tags to search' : 'Enter URL to scrape'}
+              className={`flex-1 px-4 py-3 rounded border-2 transition-all duration-300
+                        ${darkMode 
+                          ? 'bg-dark-card border-yellow-300 text-yellow-300 placeholder-yellow-300/50 focus:shadow-yellow' 
+                          : 'bg-white border-black text-black placeholder-gray-600'} 
+                        font-medium focus:outline-none`}
+            />
+
+            {/* Search/Scrape Button */}
+            <button
+              type="submit"
+              disabled={loading || !input.trim()}
+              className="relative"
+            >
+              <span className="absolute top-0 left-0 mt-1 ml-1 h-full w-full rounded bg-gray-700/50"></span>
+              <span className={`fold-bold relative inline-block h-full w-full rounded border-2 
+                             px-8 py-3 text-base font-bold transition-all duration-300
+                             ${darkMode 
+                               ? 'border-yellow-300 bg-dark-card text-yellow-300 hover:bg-dark-border hover:shadow-yellow' 
+                               : 'border-black bg-black text-white hover:bg-gray-900 hover:text-yellow-500'}
+                             ${(loading || !input.trim()) 
+                               ? 'opacity-50 cursor-not-allowed' 
+                               : 'hover:scale-105'}`}>
+                {loading ? (
+                  <div className="flex items-center">
+                    <svg className={`animate-spin -ml-1 mr-3 h-5 w-5 
+                                 ${darkMode ? 'text-yellow-300' : 'text-white'}`} 
+                         xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" 
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                      </path>
+                    </svg>
+                    Processing...
                   </div>
-                ))}
+                ) : (
+                  isSearchMode ? 'Search' : 'Scrape'
+                )}
+              </span>
+            </button>
+          </div>
+        </form>
+
+        {/* Error Display */}
+        {error && (
+          <div className="mt-4 p-4 bg-red-100 border-2 border-red-500 rounded text-red-700">
+            {error}
+          </div>
+        )}
+
+        {/* Results Display - Update styles */}
+        {results && !loading && (
+          <div className="mt-8">
+            {results.isSearch ? (
+              // Search Results Display
+              <div className="space-y-4">
+                <div className="mb-4">
+                  <h3 className="text-lg font-bold text-black">
+                    Found {results.searchResults.length} results
+                  </h3>
+                  {results.searchResults.map((result) => (
+                    <div key={result.id} className={`mb-4 p-4 rounded border-2 transition-all duration-300
+                                                 ${darkMode 
+                                                   ? 'bg-dark-card border-yellow-300 shadow-yellow' 
+                                                   : 'bg-white border-black'}`}>
+                      <h4 className={`font-bold ${darkMode ? 'text-yellow-300' : 'text-black'}`}>
+                        {result.url}
+                      </h4>
+                      <p className={darkMode ? 'text-gray-300' : 'text-gray-700'}>
+                        {result.summary}
+                      </p>
+                      <div className="mt-2">
+                        <span className={`font-bold mr-4 ${darkMode ? 'text-yellow-300' : 'text-black'}`}>
+                          Grade: {result.grade}
+                        </span>
+                        <span className={`font-bold ${darkMode ? 'text-yellow-300' : 'text-black'}`}>
+                          Badge: {result.badge}
+                        </span>
+                      </div>
+                      <div className="mt-2">
+                        {result.tags.map((tag) => (
+                          <span key={tag} className="relative mr-2 mb-2 inline-block cursor-pointer" 
+                                onClick={() => handleTagClick(tag)}>
+                            <span className="absolute top-0 left-0 mt-1 ml-1 h-full w-full rounded bg-gray-700/50"></span>
+                            <span className={`fold-bold relative inline-block h-full w-full rounded border-2 
+                                           px-3 py-1 text-base font-bold transition-all duration-300
+                                           ${darkMode 
+                                             ? 'border-yellow-300 bg-dark-card text-yellow-300 hover:bg-dark-border' 
+                                             : 'border-black bg-black text-white hover:bg-gray-900 hover:text-yellow-500'}`}>
+                              #{tag}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                      <div className={`mt-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Added: {new Date(result.timestamp).toLocaleDateString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          ) : (
-            // Scrape Results Display
-            <div className="p-4 bg-white rounded border-2 border-black">
-              <h3 className="font-bold">{results.url}</h3>
-              <p className="text-gray-700 mt-2">{results.summary}</p>
-              {results.grade && (
+            ) : (
+              // Scrape Results Display
+              <div className={`p-4 rounded border-2
+                           ${darkMode 
+                             ? 'bg-dark-card border-dark-border' 
+                             : 'bg-white border-black'}`}>
+                <h3 className="font-bold text-black">{results.url}</h3>
+                <p className="text-gray-700 mt-2">{results.summary}</p>
+                {(results.grade || results.badge) && (
+                  <div className="mt-2">
+                    <span className="font-bold text-black mr-4">Grade: {results.grade}</span>
+                    <span className="font-bold text-black">Badge: {results.badge}</span>
+                  </div>
+                )}
                 <div className="mt-2">
-                  <span className="font-bold">Grade: {results.grade}</span>
+                  {results.tags.map((tag) => (
+                    <TagDisplay key={tag} tag={tag} />
+                  ))}
                 </div>
-              )}
-              <div className="mt-2">
-                {results.tags.map((tag, i) => (
-                  <span key={i} className="mr-2 px-2 py-1 bg-gray-200 rounded">
-                    #{tag}
-                  </span>
-                ))}
+                {results.is_duplicate && (
+                  <div className="mt-2 text-gray-600">
+                    (Retrieved from cache)
+                  </div>
+                )}
               </div>
-              {results.is_duplicate && (
-                <div className="mt-2 text-gray-600">
-                  (Retrieved from cache)
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
