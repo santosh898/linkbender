@@ -37,12 +37,21 @@ function App() {
   const scrapeNewUrl = async (url) => {
     try {
       const response = await fetch(`http://localhost:8000/scrape?url=${encodeURIComponent(url)}`);
-      if (!response.ok) throw new Error('Failed to scrape URL');
       const data = await response.json();
-      console.log('Scraped Data:', data); // Debug log
+      console.log('Scrape response:', data); // Debug log
+
+      if (!response.ok || data.status === 'error') {
+        throw new Error(data.error || 'Failed to scrape URL');
+      }
+      
       return data;
     } catch (error) {
-      throw new Error(`Scraping failed: ${error.message}`);
+      console.error('Scraping error:', error);
+      if (error.response) {
+        const errorData = await error.response.json();
+        throw new Error(errorData.error || 'Failed to scrape URL');
+      }
+      throw error;
     }
   };
 
@@ -60,7 +69,7 @@ function App() {
   };
 
   // MAIN SUBMISSION HANDLER
-  const handleSubmit = async (e) => {
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     const trimmedInput = input.trim();
     if (!trimmedInput) return;
@@ -71,11 +80,9 @@ function App() {
 
     try {
       if (isSearchMode) {
-        // SEARCH MODE FLOW
         console.log('Starting search for tags:', trimmedInput);
         const searchData = await searchByTags(trimmedInput);
         
-        // Map the DB structure directly to results
         setResults({
           searchResults: searchData.results.map(result => ({
             id: result._id,
@@ -93,34 +100,40 @@ function App() {
         // SCRAPE MODE FLOW
         console.log('Starting scrape for URL:', trimmedInput);
         
-        // 1. Validate URL format
         try {
           new URL(trimmedInput);
         } catch {
           throw new Error('Please enter a valid URL');
         }
 
-        // 2. Check if URL exists
+        // Check if URL exists
         console.log('Checking URL existence...');
         const urlCheck = await checkUrl(trimmedInput);
         
-        // 3. Get data based on URL check
+        // Get data based on URL check
         console.log('URL exists:', urlCheck.exists);
-        const data = urlCheck.exists 
-          ? await getCachedData(trimmedInput)
-          : await scrapeNewUrl(trimmedInput);
-
-        // 4. Process and set results
-        console.log('Processing final data:', data);
-        setResults({
-          url: trimmedInput,
-          summary: data.response.summary,
-          grade: data.response.grade,
-          tags: data.response.tags,
-          is_duplicate: urlCheck.exists,
-          message: data.message,
-          isSearch: false
-        });
+        let data;
+        try {
+          data = urlCheck.exists 
+            ? await getCachedData(trimmedInput)
+            : await scrapeNewUrl(trimmedInput);
+          
+          console.log('Processing final data:', data);
+          
+          setResults({
+            url: trimmedInput,
+            summary: data.response.summary,
+            grade: data.response.grade,
+            badge: data.response.badge,
+            tags: data.response.tags,
+            is_duplicate: urlCheck.exists,
+            message: data.message,
+            isSearch: false
+          });
+        } catch (scrapeError) {
+          console.error('Scraping/Cache error:', scrapeError);
+          throw new Error(`Failed to process URL: ${scrapeError.message}`);
+        }
       }
     } catch (err) {
       console.error('Error in submission:', err);
@@ -128,7 +141,7 @@ function App() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [input, isSearchMode]);
 
   // MODE SWITCH HANDLER
   const handleModeChange = useCallback((checked) => {
@@ -144,6 +157,30 @@ function App() {
     setInput(e.target.value);
     setError(null);
   }, []);
+
+  // Add a new handler function near your other handlers
+  const handleTagClick = useCallback((tag) => {
+    setIsSearchMode(true);  // Switch to search mode
+    setInput(tag);         // Set the tag as input
+    handleSubmit(new Event('submit')); // Trigger search
+  }, [handleSubmit]);
+
+  // Update the tag display in both search results and scrape results
+  const TagDisplay = ({ tag }) => (
+    <span 
+      key={tag} 
+      className="relative mr-2 mb-2 inline-block cursor-pointer" 
+      onClick={() => handleTagClick(tag)}
+      title={`Click to search for #${tag}`}
+    >
+      <span className="absolute top-0 left-0 mt-1 ml-1 h-full w-full rounded bg-gray-700"></span>
+      <span className="fold-bold relative inline-block h-full w-full rounded border-2 
+                     border-black bg-black px-3 py-1 text-base font-bold text-white 
+                     transition duration-100 hover:bg-gray-900 hover:text-yellow-500">
+        #{tag}
+      </span>
+    </span>
+  );
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
@@ -235,15 +272,8 @@ function App() {
                       <span className="font-bold text-black">Badge: {result.badge}</span>
                     </div>
                     <div className="mt-2">
-                      {result.tags.map((tag, i) => (
-                        <span key={i} className="relative mr-2 mb-2 inline-block">
-                          <span className="absolute top-0 left-0 mt-1 ml-1 h-full w-full rounded bg-gray-700"></span>
-                          <span className="fold-bold relative inline-block h-full w-full rounded border-2 
-                                         border-black bg-black px-3 py-1 text-base font-bold text-white 
-                                         transition duration-100 hover:bg-gray-900 hover:text-yellow-500">
-                            #{tag}
-                          </span>
-                        </span>
+                      {result.tags.map((tag) => (
+                        <TagDisplay key={tag} tag={tag} />
                       ))}
                     </div>
                     <div className="mt-2 text-sm text-gray-500">
@@ -265,15 +295,8 @@ function App() {
                 </div>
               )}
               <div className="mt-2">
-                {results.tags.map((tag, i) => (
-                  <span key={i} className="relative mr-2 mb-2 inline-block">
-                    <span className="absolute top-0 left-0 mt-1 ml-1 h-full w-full rounded bg-gray-700"></span>
-                    <span className="fold-bold relative inline-block h-full w-full rounded border-2 
-                                     border-black bg-black px-3 py-1 text-base font-bold text-white 
-                                     transition duration-100 hover:bg-gray-900 hover:text-yellow-500">
-                      #{tag}
-                    </span>
-                  </span>
+                {results.tags.map((tag) => (
+                  <TagDisplay key={tag} tag={tag} />
                 ))}
               </div>
               {results.is_duplicate && (
