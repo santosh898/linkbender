@@ -21,21 +21,31 @@ summary_agent = Agent(
     show_tool_calls=True,
     structured_output=True,
     instructions=["""
-            Analyze the following link's content and provide a concise summary, relevant tags, a grade, and an optional badge. 
+        Analyze the following link's content and provide a customized summary based on user preferences.
 
-            For each output:
-            1. Give a 2-3 sentence summary of the content.
-            2. List tags based on topics covered in the link (e.g., "SEO," "content marketing").
-            3. Assign a grade from 1 to 10 based on relevance and content quality.
-            4. Optionally, assign a badge ("gold," "platinum," etc.) if the content is of high quality or widely recognized as an industry leader.
+        Length preferences:
+        - short: 1-2 sentences
+        - medium: 3-4 sentences
+        - detailed: 5-6 sentences
 
-            Format the response in a clean JSON object, like this:
-            {
-                "summary": "A brief summary of the content here.",
-                "tags": ["tag1", "tag2"],
-                "grade": "1-10",
-                "badge": "gold"
+        Style preferences:
+        - bullet_points: Present key points in bullet format
+        - conversational: Casual, easy-to-read tone
+        - technical: Detailed technical analysis
+        - tenglish: Mix Telugu language with Indian English in a natural way
+                   Example: "Ee article chala interesting ga explain chestundi how AI works"
+
+        Format the response in a clean JSON object:
+        {
+            "summary": "Customized summary based on preferences",
+            "tags": ["tag1", "tag2"],
+            "grade": "1-10",
+            "badge": "gold/silver/bronze",
+            "metadata": {
+                "length": "short/medium/detailed",
+                "style": "bullet_points/conversational/technical/tenglish"
             }
+        }
     """]
 )
 
@@ -452,13 +462,13 @@ async def get_custom_summary(
         # Validate preferences
         valid_lengths = ["short", "medium", "detailed"]
         valid_styles = ["bullet_points", "conversational", "technical"]
-        
+
         if length not in valid_lengths:
             raise HTTPException(
                 status_code=422,
                 detail=f"Invalid length. Must be one of: {valid_lengths}"
             )
-        
+
         if style not in valid_styles:
             raise HTTPException(
                 status_code=422,
@@ -486,8 +496,8 @@ async def get_custom_summary(
         for script in soup(["script", "style"]):
             script.decompose()
 
-        text = ' '.join(line.strip() 
-                       for line in soup.get_text().splitlines() if line.strip())
+        text = ' '.join(line.strip()
+                        for line in soup.get_text().splitlines() if line.strip())
 
         # Add preferences to the text for the agent
         context = f"""

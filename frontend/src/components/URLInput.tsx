@@ -1,6 +1,6 @@
-import React from 'react';
-import { Search, Settings } from 'lucide-react';
-import { CustomPreferences } from '../types';
+import React from "react";
+import { Search, Settings } from "lucide-react";
+import { CustomPreferences } from "../types";
 
 interface URLInputProps {
   url: string;
@@ -53,17 +53,24 @@ export const URLInput: React.FC<URLInputProps> = ({
       className="text-sm text-gray-400 hover:text-white flex items-center gap-1 transition-colors"
     >
       <Settings size={16} />
-      {showCustomize ? 'Hide' : 'Show'} Advanced Options
+      {showCustomize ? "Hide" : "Show"} Advanced Options
     </button>
 
     {showCustomize && (
       <div className="mt-4 p-4 bg-gray-700 rounded-md">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Summary Length</label>
+            <label className="block text-sm font-medium mb-2">
+              Summary Length
+            </label>
             <select
               value={preferences.length}
-              onChange={(e) => onPreferencesChange({ ...preferences, length: e.target.value as CustomPreferences['length'] })}
+              onChange={(e) =>
+                onPreferencesChange({
+                  ...preferences,
+                  length: e.target.value as CustomPreferences["length"],
+                })
+              }
               className="w-full bg-gray-600 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="short">Short</option>
@@ -75,12 +82,18 @@ export const URLInput: React.FC<URLInputProps> = ({
             <label className="block text-sm font-medium mb-2">Style</label>
             <select
               value={preferences.style}
-              onChange={(e) => onPreferencesChange({ ...preferences, style: e.target.value as CustomPreferences['style'] })}
+              onChange={(e) =>
+                onPreferencesChange({
+                  ...preferences,
+                  style: e.target.value as CustomPreferences["style"],
+                })
+              }
               className="w-full bg-gray-600 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="bullet_points">Bullet Points</option>
               <option value="conversational">Conversational</option>
               <option value="technical">Technical</option>
+              <option value="tenglish">T-English</option>
             </select>
           </div>
         </div>
