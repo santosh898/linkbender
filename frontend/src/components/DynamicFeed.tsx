@@ -73,70 +73,87 @@ export const DynamicFeed: React.FC<DynamicFeedProps> = ({
     onToggle: () => void;
     onDragStart: () => void;
   }> = ({ item, isExpanded, onToggle, onDragStart }) => {
-    const getBadgeColor = (badge: string) => {
+    const getBadgeStyle = (badge: string) => {
       switch (badge) {
         case 'gold':
-          return 'bg-yellow-500/20 text-yellow-500';
+          return 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20';
         case 'silver':
-          return 'bg-gray-400/20 text-gray-400';
+          return 'bg-gray-400/10 text-gray-400 border border-gray-400/20';
         case 'bronze':
-          return 'bg-orange-700/20 text-orange-700';
+          return 'bg-orange-700/10 text-orange-700 border border-orange-700/20';
         default:
-          return 'bg-gray-700/20 text-gray-300';
+          return 'bg-gray-700/10 text-gray-300 border border-gray-700/20';
       }
+    };
+
+    const getGradeColor = (grade: string) => {
+      const numGrade = parseInt(grade);
+      if (numGrade >= 8) return 'text-green-400';
+      if (numGrade >= 6) return 'text-blue-400';
+      if (numGrade >= 4) return 'text-yellow-400';
+      return 'text-red-400';
     };
 
     return (
       <div
         draggable
         onDragStart={onDragStart}
-        className="bg-gray-800 rounded-lg p-4 shadow-lg cursor-move hover:shadow-xl transition-all"
+        className="group bg-gray-800/80 backdrop-blur-sm rounded-lg p-4 shadow-lg cursor-move 
+                   hover:shadow-xl transition-all duration-300 hover:bg-gray-800 
+                   border border-gray-700/50 hover:border-gray-600/50"
       >
         <div className="flex justify-between items-start mb-3">
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 flex-1">
             <a
               href={item.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-400 hover:text-blue-300 transition-colors text-sm"
+              className="text-blue-400 hover:text-blue-300 transition-colors text-sm truncate max-w-[200px]"
             >
               {new URL(item.url).hostname}
             </a>
             {item.preferences && (
-              <span className="text-xs text-gray-400">
-                {item.preferences.style === 'tenglish' ? 'Tenglish' : 'English'} • {item.preferences.length}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">
+                  {item.preferences.style === 'tenglish' ? 'Tenglish' : 'English'}
+                </span>
+                <span className="w-1 h-1 bg-gray-600 rounded-full" />
+                <span className="text-xs text-gray-400">
+                  {item.preferences.length}
+                </span>
+              </div>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-400">
-              Grade: {item.grade}/10
+            <span className={`text-sm font-medium ${getGradeColor(item.grade)}`}>
+              {item.grade}/10
             </span>
             {item.badge && (
-              <span className={`px-2 py-1 rounded-full text-xs ${getBadgeColor(item.badge)}`}>
+              <span className={`px-2 py-1 rounded-full text-xs ${getBadgeStyle(item.badge)}`}>
                 {item.badge}
               </span>
             )}
           </div>
         </div>
-        
+
         <div className="relative">
-          <p className={`text-gray-300 text-sm mb-3 ${
-            isExpanded ? '' : 'line-clamp-3'
-          }`}>
+          <p className={`text-gray-300 text-sm mb-3 transition-all duration-300
+            ${isExpanded ? 'line-clamp-none' : 'line-clamp-3'}`}>
             {item.summary}
           </p>
           {!isExpanded && (
-            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-gray-800 to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t 
+                           from-gray-800 to-transparent group-hover:from-gray-800" />
           )}
         </div>
-        
+
         <div className="flex items-center justify-between">
           <div className="flex flex-wrap gap-1">
             {item.tags.map((tag, tagIndex) => (
               <span
                 key={tagIndex}
-                className="px-2 py-1 bg-gray-700 rounded-full text-xs text-gray-300"
+                className="px-2 py-1 bg-gray-700/50 rounded-full text-xs text-gray-300
+                       hover:bg-gray-600/50 transition-colors"
               >
                 {tag}
               </span>
@@ -144,7 +161,8 @@ export const DynamicFeed: React.FC<DynamicFeedProps> = ({
           </div>
           <button
             onClick={onToggle}
-            className="text-gray-400 hover:text-white transition-colors"
+            className="p-1 text-gray-400 hover:text-white transition-colors
+                       hover:bg-gray-700/50 rounded-full"
           >
             {isExpanded ? (
               <ChevronUp size={16} />
@@ -153,9 +171,9 @@ export const DynamicFeed: React.FC<DynamicFeedProps> = ({
             )}
           </button>
         </div>
-        
+
         {isExpanded && item.content && (
-          <div className="mt-4 pt-4 border-t border-gray-700">
+          <div className="mt-4 pt-4 border-t border-gray-700/50">
             <p className="text-sm text-gray-400">
               {item.content}
             </p>

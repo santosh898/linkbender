@@ -5,7 +5,7 @@ import { DynamicFeed } from './DynamicFeed';
 
 const BACKEND_URL = process.env.VITE_BACKEND_URL;
 const STORAGE_KEY = 'linkbender_feeds';
-
+ 
 const defaultFeeds: FeedConfig[] = [
   { id: '1', name: 'Recent', sortBy: 'recent', selectedTags: [], items: [] },
   { id: '2', name: 'High Grade', sortBy: 'grade', selectedTags: [], items: [] },
