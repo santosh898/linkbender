@@ -26,9 +26,13 @@ export interface FeedItem {
   summary: string;
   tags: string[];
   grade: string;
-  badge: string;
+  badge: 'gold' | 'silver' | 'bronze';
   timestamp: string;
   content?: string;
+  preferences?: {
+    length: 'short' | 'medium' | 'detailed';
+    style: 'bullet_points' | 'conversational' | 'technical' | 'tenglish';
+  };
 }
 
 export interface TagGroup {
@@ -40,4 +44,24 @@ export interface TagGroup {
 export interface PopularTag {
   name: string;
   count: number;
+}
+
+export interface FeedConfig {
+  id: string;
+  name: string;
+  sortBy: 'tags' | 'grade' | 'recent';
+  selectedTags: string[];
+  items: FeedItem[];
+  preferences?: {
+    showContent: boolean;
+    showPreferences: boolean;
+    maxItems?: number;
+  };
+}
+
+export interface DynamicFeedProps {
+  config: FeedConfig;
+  onConfigChange: (config: FeedConfig) => void;
+  onDragStart: (item: FeedItem) => void;
+  onDrop: (feedId: string) => void;
 }
