@@ -65,6 +65,8 @@ custom_summary_agent = Agent(
         - bullet_points: Present key points in bullet format
         - conversational: Casual, easy-to-read tone
         - technical: Detailed technical analysis,relatable to the content of the url
+        - tenglish: Mix Telugu language with Indian English in a natural way
+                   Example: "Ee article chala interesting ga explain chestundi how AI works"
 
         Format the response in a clean JSON object:
         {
@@ -74,7 +76,7 @@ custom_summary_agent = Agent(
             "badge": "gold/silver/bronze",
             "metadata": {
                 "length": "short/medium/detailed",
-                "style": "bullet_points/conversational/technical"
+                "style": "bullet_points/conversational/technical/tenglish"
             }
         }
     """]
@@ -461,7 +463,7 @@ async def get_custom_summary(
     try:
         # Validate preferences
         valid_lengths = ["short", "medium", "detailed"]
-        valid_styles = ["bullet_points", "conversational", "technical"]
+        valid_styles = ["bullet_points", "conversational", "technical", "tenglish"]
 
         if length not in valid_lengths:
             raise HTTPException(
