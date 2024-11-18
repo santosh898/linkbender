@@ -39,6 +39,37 @@ summary_agent = Agent(
     """]
 )
 
+custom_summary_agent = Agent(
+    model=xAI(id="grok-beta"),
+    show_tool_calls=True,
+    structured_output=True,
+    instructions=["""
+        Analyze the following link's content and provide a customized summary based on user preferences.
+
+        Length preferences:
+        - short: 1-2 sentences
+        - medium: 3-4 sentences
+        - detailed: 5-6 sentences
+
+        Style preferences:
+        - bullet_points: Present key points in bullet format
+        - conversational: Casual, easy-to-read tone
+        - technical: Detailed technical analysis,relatable to the content of the url
+
+        Format the response in a clean JSON object:
+        {
+            "summary": "Customized summary based on preferences",
+            "tags": ["tag1", "tag2"],
+            "grade": "1-10",
+            "badge": "gold/silver/bronze",
+            "metadata": {
+                "length": "short/medium/detailed",
+                "style": "bullet_points/conversational/technical"
+            }
+        }
+    """]
+)
+
 app = FastAPI()
 
 # Add CORS middleware
@@ -158,7 +189,6 @@ async def scrape(url: str):
             mongo_doc = {
                 'url': url,
                 'summary': response_data['summary'],
-                'tags': [tag.lower().strip() for tag in response_data['tags']],
                 'grade': response_data['grade'],
                 'badge': response_data['badge'],
                 'timestamp': datetime.now(),
@@ -410,3 +440,113 @@ async def read_items():
         </body>
     </html>
     """
+
+
+@app.get("/custom-summary")
+async def get_custom_summary(
+    url: str,
+    length: str = "medium",
+    style: str = "conversational"
+):
+    try:
+        # Validate preferences
+        valid_lengths = ["short", "medium", "detailed"]
+        valid_styles = ["bullet_points", "conversational", "technical"]
+        
+        if length not in valid_lengths:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid length. Must be one of: {valid_lengths}"
+            )
+        
+        if style not in valid_styles:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid style. Must be one of: {valid_styles}"
+            )
+
+        # Reuse existing URL validation and fetching logic
+        if not url:
+            raise HTTPException(status_code=422, detail="URL is required")
+
+        # Normalize URL
+        parsed_url = urlparse(url)
+        if not parsed_url.scheme:
+            url = f"https://{url}"
+
+        # Fetch and parse content (reusing existing logic)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+        for script in soup(["script", "style"]):
+            script.decompose()
+
+        text = ' '.join(line.strip() 
+                       for line in soup.get_text().splitlines() if line.strip())
+
+        # Add preferences to the text for the agent
+        context = f"""
+        PREFERENCES:
+        Length: {length}
+        Style: {style}
+
+        CONTENT:
+        {text}
+        """
+
+        # Get custom summary
+        agent_response = custom_summary_agent.run(context)
+
+        # Process response (similar to existing logic)
+        if isinstance(agent_response.content, dict):
+            response_data = agent_response.content
+        else:
+            clean_response = (
+                agent_response.content
+                .replace('```json', '')
+                .replace('```', '')
+                .strip()
+            )
+            response_data = json.loads(clean_response)
+
+        # Store in MongoDB with preferences
+        mongo_doc = {
+            'url': url,
+            'summary': response_data['summary'],
+            'tags': response_data['tags'],
+            'grade': response_data['grade'],
+            'badge': response_data['badge'],
+            'preferences': {
+                'length': length,
+                'style': style
+            },
+            'timestamp': datetime.now(),
+            'content': text[:1000]  # Store first 1000 chars
+        }
+        collection.insert_one(mongo_doc)
+
+        return {
+            "status": "success",
+            "response": response_data,
+            "preferences": {
+                "length": length,
+                "style": style
+            }
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "response": {
+                "summary": "Failed to generate custom summary",
+                "tags": ["error"],
+                "grade": "0",
+                "badge": "none"
+            }
+        }
