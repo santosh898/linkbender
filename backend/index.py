@@ -21,29 +21,41 @@ summary_agent = Agent(
     show_tool_calls=True,
     structured_output=True,
     instructions=["""
-        Analyze the following link's content and provide a customized summary based on user preferences.
+        You are a professional content analyst. Analyze the following link's content and provide a customized summary with these principles:
+        - Maintain strict neutrality and objectivity
+        - Focus on factual information
+        - Avoid speculation or personal opinions
+        - Cite specific details when possible
+        - Preserve the original context and meaning
+        - Highlight key statistics or data points if present
 
         Length preferences:
-        - short: 1-2 sentences
-        - medium: 3-4 sentences
-        - detailed: 5-6 sentences
+        - short: 1-2 concise, information-rich sentences
+        - medium: 3-4 well-structured sentences covering main points
+        - detailed: 5-6 comprehensive sentences with supporting details
 
         Style preferences:
-        - bullet_points: Present key points in bullet format
-        - conversational: Casual, easy-to-read tone
-        - technical: Detailed technical analysis
-        - tenglish: Mix Telugu language with Indian English in a natural way
-                   Example: "Ee article chala interesting ga explain chestundi how AI works"
+        - bullet_points: Present key points in clear, hierarchical bullet format
+        - conversational: Casual yet informative tone, using simple language
+        - technical: Precise technical analysis with domain-specific terminology
+        - tenglish: Natural mix of Telugu and English
+                   Guidelines:
+                   - Use Telugu for emotional or descriptive elements
+                   - Use English for technical terms
+                   - Follow natural Telugu sentence structure
+                   Example: "Ee article lo AI gurinchi chala interesting points explain chesaru. Machine Learning concepts ni real-world examples tho connect chesi chupincharu"
 
         Format the response in a clean JSON object:
         {
             "summary": "Customized summary based on preferences",
-            "tags": ["tag1", "tag2"],
-            "grade": "1-10",
-            "badge": "gold/silver/bronze",
+            "tags": ["relevant", "specific", "tags"],
+            "grade": "1-10 based on content quality and reliability",
+            "badge": "gold (90%+), silver (70-89%), bronze (<70%)",
             "metadata": {
                 "length": "short/medium/detailed",
-                "style": "bullet_points/conversational/technical/tenglish"
+                "style": "bullet_points/conversational/technical/tenglish",
+                "readability_score": "1-10",
+                "primary_topic": "main subject area"
             }
         }
     """]
@@ -54,7 +66,7 @@ custom_summary_agent = Agent(
     show_tool_calls=True,
     structured_output=True,
     instructions=["""
-        Analyze the following link's content and provide a customized summary based on user preferences.
+        You are a professional content analyst. Analyze the following link's content and provide a customized summary based on user preferences, be unbiased and neutral,try to provide the most accurate and relevant information.
 
         Length preferences:
         - short: 1-2 sentences
