@@ -10,11 +10,37 @@ from phi.model.xai import xAI
 from pymongo import MongoClient
 from urllib.parse import quote_plus, urlparse, urljoin
 from dotenv import load_dotenv
+from os import getenv
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from phi.knowledge.json import JSONKnowledgeBase
+from phi.vectordb.qdrant import Qdrant
+from phi.embedder.openai import OpenAIEmbedder
+from phi.document import Document
+from os import getenv
 import aiohttp
+from bson import ObjectId
 
 load_dotenv()
+
+QD_API_KEY = getenv("QDRANT_API_KEY")
+QD_URL = getenv("QDRANT_URL")
+OPENAI_API_KEY = getenv("ORIGINAL_OPENAI_API_KEY")
+
+vector_db = Qdrant(
+    collection="linkbender",
+    url=QD_URL,
+    api_key=QD_API_KEY,
+    embedder=OpenAIEmbedder(
+        api_key=OPENAI_API_KEY,
+    )
+)
+
+
+knowledge_base = JSONKnowledgeBase(
+    vector_db=vector_db,
+    path="data/json",
+)
 
 summary_agent = Agent(
     model=xAI(id="grok-beta"),
@@ -94,6 +120,22 @@ custom_summary_agent = Agent(
     """]
 )
 
+talking_agent = Agent(
+    model=xAI(id="grok-beta"),
+    show_tool_calls=False,
+    vector_db=vector_db,
+    knowledge_base=knowledge_base,
+    structured_outputs=True,
+    instructions=["""
+            You retrieve relevant information from the knowledge base and provide a JSON response with the IDs from the documents.
+                  Response Format:
+                  {
+                    "relevant_documents": ["doc_id1", "doc_id2", "doc_id3"]
+                  }
+                  YOUR RESPONSE WILL BE FED THROUGH A JSON DECODER AND NO HUMAN FRIENDLY TEXT OR MARKDOWN FORMATTING IS EXPECTED.
+                  """]
+)
+
 app = FastAPI()
 
 # Add CORS middleware
@@ -116,7 +158,42 @@ collection = db['scrapes']
 tags_collection = db['tags']
 
 
-@app.get("/scrape")
+@app.get("/talk")
+async def talk(query: str):
+    response = talking_agent.run(query)
+    if isinstance(response.content, dict):
+        response_data = response.content
+    else:
+        # Clean the string response
+        clean_response = (
+            response.content
+            .replace('```json', '')
+            .replace('```', '')
+            .strip()
+        )
+
+        response_data = json.loads(clean_response)
+
+    doc_ids = response_data.get("relevant_documents", [])
+
+    results = list(collection.find(
+        {"_id": {"$in": [ObjectId(doc_id) for doc_id in doc_ids]}},
+        {
+            '_id': 0,  # Exclude MongoDB _id field
+            'url': 1,
+            'summary': 1,
+            'tags': 1,
+            'grade': 1,    # Make sure grade is included
+            'badge': 1,    # Make sure badge is included
+            'timestamp': 1,
+            # First 200 chars as preview
+            'content': {'$substr': ['$content', 0, 200]}
+        }
+    ).sort('timestamp', -1))
+    return {"results": results}
+
+
+@ app.get("/scrape")
 async def scrape(url: str):
     try:
         # Validate URL
@@ -188,6 +265,17 @@ async def scrape(url: str):
                 "badge": str(response_data.get("badge", "error"))
             }
 
+            adapted_response_data = {
+                "content": f"{response_data['summary']} {', '.join(response_data['tags'])} {response_data['grade']} {response_data['badge']}",
+                "metadata": {
+                    "summary": response_data["summary"],
+                    "tags": response_data["tags"],
+                    "grade": response_data["grade"],
+                    "badge": response_data["badge"]
+                },
+                "name": url,
+            }
+
             # Before storing in MongoDB, process and update tags
             existing_tags = set(tag['name'] for tag in tags_collection.find())
             new_tags = []
@@ -218,7 +306,13 @@ async def scrape(url: str):
                 'timestamp': datetime.now(),
                 'content': text[:1000]
             }
-            collection.insert_one(mongo_doc)
+            mongo_doc = collection.insert_one(mongo_doc)
+            doc = Document(
+                content=adapted_response_data['content'],
+                name=mongo_doc.inserted_id.__str__(),
+                meta_data=adapted_response_data['metadata']
+            )
+            vector_db.insert([doc])
 
             return {
                 "text": text[:500],
@@ -269,7 +363,7 @@ async def scrape(url: str):
         }
 
 
-@app.get("/scrapes")
+@ app.get("/scrapes")
 async def get_scrapes():
     try:
         # Get all documents with all fields
@@ -300,13 +394,13 @@ async def get_scrapes():
         }
 
 
-@app.post("/ask")
+@ app.post("/ask")
 async def ask(question: str):
     response = summary_agent.run(question)
     return response.content
 
 
-@app.get("/test-db")
+@ app.get("/test-db")
 async def test_db():
     try:
         # Try to insert a test document
@@ -328,13 +422,13 @@ async def test_db():
         }
 
 
-@app.get("/tags")
+@ app.get("/tags")
 async def get_tags():
     tags_list = list(tags_collection.find({}, {'_id': 0}))
     return {"tags": tags_list}
 
 
-@app.get("/search-by-tags")
+@ app.get("/search-by-tags")
 async def search_by_tags(tags: str):
     try:
         # Split tags string into list and normalize them
@@ -381,7 +475,7 @@ async def search_by_tags(tags: str):
         }
 
 
-@app.get("/check-url")
+@ app.get("/check-url")
 async def check_url(url: str):
     try:
         # Normalize the URL
@@ -401,7 +495,7 @@ async def check_url(url: str):
         return {"error": str(e), "status": "error"}
 
 
-@app.get("/get-cached")
+@ app.get("/get-cached")
 async def get_cached(url: str):
     try:
         # Normalize the URL
@@ -451,7 +545,7 @@ async def get_cached(url: str):
         }
 
 
-@app.get("/", response_class=HTMLResponse)
+@ app.get("/", response_class=HTMLResponse)
 async def read_items():
     return """
     <html>
@@ -466,7 +560,7 @@ async def read_items():
     """
 
 
-@app.get("/custom-summary")
+@ app.get("/custom-summary")
 async def get_custom_summary(
     url: str,
     length: str = "medium",
@@ -475,7 +569,8 @@ async def get_custom_summary(
     try:
         # Validate preferences
         valid_lengths = ["short", "medium", "detailed"]
-        valid_styles = ["bullet_points", "conversational", "technical", "tenglish"]
+        valid_styles = ["bullet_points",
+                        "conversational", "technical", "tenglish"]
 
         if length not in valid_lengths:
             raise HTTPException(
