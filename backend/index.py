@@ -126,14 +126,27 @@ talking_agent = Agent(
     vector_db=vector_db,
     knowledge_base=knowledge_base,
     structured_outputs=True,
-    instructions=["""
-            You retrieve relevant information from the knowledge base and provide a JSON response with the IDs from the documents.
-                  Response Format:
-                  {
-                    "relevant_documents": ["doc_id1", "doc_id2", "doc_id3"]
-                  }
-                  YOUR RESPONSE WILL BE FED THROUGH A JSON DECODER AND NO HUMAN FRIENDLY TEXT OR MARKDOWN FORMATTING IS EXPECTED.
-                  """]
+   instructions=["""
+        You are an intelligent retrieval agent tasked with finding and providing relevant documents from the knowledge base. Follow these instructions:
+        - Use the provided query to retrieve the most contextually relevant document IDs.
+        - Ensure the retrieved documents are accurate and highly relevant to the query.
+        - If no relevant documents are found, include a specific message in the JSON response to indicate this, while keeping the response format strict.
+
+        Response Format:
+        {
+            "relevant_documents": ["doc_id1", "doc_id2", "doc_id3"],
+            "message": "No relevant documents found."  // Only include this when the list is empty.
+        }
+
+        Constraints:
+        - Do not include any explanatory text or comments outside the JSON structure.
+        - Ensure the response is parsable and contains only valid JSON.
+        - Maintain an empty list for "relevant_documents" if no matches are found.
+
+        Notes:
+        - Focus on precision and avoid irrelevant matches.
+        - The response will be fed directly to a JSON decoder; any deviations will cause errors.
+    """]
 )
 
 app = FastAPI()

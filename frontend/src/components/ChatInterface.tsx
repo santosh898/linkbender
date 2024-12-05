@@ -1,99 +1,117 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Minimize2, Maximize2, Loader2 } from 'lucide-react';
-import { ChatMessage } from '../types';
+import React, { useState, useEffect, useRef } from "react";
+import { Loader2, Minimize2 } from "lucide-react";
 
-interface ChatInterfaceProps {
-  onSendMessage: (message: string) => Promise<void>;
+interface ChatMessage {
+  id: number;
+  content: string;
+  type: "user" | "assistant";
+  timestamp: Date;
 }
 
-export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [message, setMessage] = useState('');
+interface ChatInterfaceProps {
+  onSendMessage: (message: string) => Promise<any>;
+}
+
+export const ChatInterface: React.FC<ChatInterfaceProps> = ({
+  onSendMessage,
+}) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isTyping, setIsTyping] = useState(false);
+  const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  const [isTyping, setIsTyping] = useState(false);
 
   const handleSend = async () => {
-    if (!message.trim()) return;
+    if (!input.trim()) return;
 
     const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      content: message,
-      type: 'user',
+      id: Date.now(),
+      content: input,
+      type: "user",
       timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
-    setMessage('');
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
     setIsTyping(true);
 
-    try {
-      await onSendMessage(message);
+    const response = await onSendMessage(input);
+
+    if (response && response.results) {
       const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        content: 'I received your message and am processing it...',
-        type: 'assistant',
+        id: Date.now() + 1,
+        content: response.results
+          .map(
+            (result: any) => `
+              <div class="bg-gray-800 p-4 rounded-lg mb-4">
+                <h4 class="text-lg font-semibold text-blue-400">URL: <a href="${result.url}" target="_blank" class="underline">${result.url}</a></h4>
+                <p class="text-gray-300">Summary: ${result.summary}</p>
+                <p class="text-gray-400">Grade: <span class="font-bold">${result.grade}</span></p>
+                <p class="text-gray-400">Badge: <span class="font-bold">${result.badge}</span></p>
+              </div>
+            `
+          )
+          .join(""),
+        type: "assistant",
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, assistantMessage]);
-    } catch (error) {
-      console.error('Failed to send message:', error);
-    } finally {
-      setIsTyping(false);
+
+      setMessages((prev) => [...prev, assistantMessage]);
+    } else {
+      const errorMessage: ChatMessage = {
+        id: Date.now() + 1,
+        content:
+          "Sorry, I couldn't retrieve the information. Please try again.",
+        type: "assistant",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
     }
+
+    setIsTyping(false);
   };
 
-  if (!isOpen) {
-    return (
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 bg-blue-500 text-white p-4 rounded-full shadow-lg hover:bg-blue-600 transition-colors"
-      >
-        <Maximize2 size={24} />
-      </button>
-    );
-  }
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   return (
-    <div className="fixed bottom-4 right-4 w-96 bg-gray-800 rounded-lg shadow-xl flex flex-col">
-      <div className="p-4 border-b border-gray-700 flex justify-between items-center">
-        <h3 className="font-semibold">Chat with LinkBender</h3>
+    <div className="flex flex-col h-full bg-gray-900 p-4">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-xl font-semibold text-white">
+          Chat with LinkBender
+        </h3>
         <button
-          onClick={() => setIsOpen(false)}
+          onClick={() => setMessages([])} // Clear chat button
           className="text-gray-400 hover:text-white transition-colors"
         >
           <Minimize2 size={20} />
         </button>
       </div>
 
-      <div className="flex-1 p-4 h-96 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto bg-gray-800 rounded-lg p-4 mb-4">
         {messages.map((msg) => (
           <div
             key={msg.id}
             className={`mb-4 ${
-              msg.type === 'user' ? 'ml-auto' : 'mr-auto'
+              msg.type === "user" ? "text-right" : "text-left"
             }`}
           >
             <div
               className={`p-3 rounded-lg max-w-[80%] ${
-                msg.type === 'user'
-                  ? 'bg-blue-500 text-white ml-auto'
-                  : 'bg-gray-700 text-gray-200'
+                msg.type === "user"
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-700 text-gray-200"
               }`}
             >
-              {msg.content}
+              {msg.type === "assistant" ? (
+                <div dangerouslySetInnerHTML={{ __html: msg.content }} />
+              ) : (
+                msg.content
+              )}
             </div>
             <div
               className={`text-xs text-gray-400 mt-1 ${
-                msg.type === 'user' ? 'text-right' : 'text-left'
+                msg.type === "user" ? "text-right" : "text-left"
               }`}
             >
               {msg.timestamp.toLocaleTimeString()}
@@ -109,24 +127,21 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onSendMessage }) =
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 border-t border-gray-700">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Ask me anything..."
-            className="flex-1 px-4 py-2 bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-gray-400"
-          />
-          <button
-            onClick={handleSend}
-            disabled={!message.trim() || isTyping}
-            className="p-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <Send size={20} />
-          </button>
-        </div>
+      <div className="flex">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyPress={(e) => e.key === "Enter" && handleSend()}
+          placeholder="Type your message..."
+          className="flex-1 px-4 py-2 bg-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-gray-400"
+        />
+        <button
+          onClick={handleSend}
+          className="ml-2 p-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+        >
+          Send
+        </button>
       </div>
     </div>
   );
