@@ -126,7 +126,7 @@ talking_agent = Agent(
     vector_db=vector_db,
     knowledge_base=knowledge_base,
     structured_outputs=True,
-   instructions=["""
+    instructions=["""
         You are an intelligent retrieval agent tasked with finding and providing relevant documents from the knowledge base. Follow these instructions:
         - Use the provided query to retrieve the most contextually relevant document IDs.
         - Ensure the retrieved documents are accurate and highly relevant to the query.
@@ -464,7 +464,7 @@ async def search_by_tags(tags: str):
                 # First 200 chars as preview
                 'content': {'$substr': ['$content', 0, 200]}
             }
-        ).sort('timestamp', -1).limit(4))
+        ).sort('timestamp', -1).limit(20))
 
         # Get related tags
         related_tags = set()

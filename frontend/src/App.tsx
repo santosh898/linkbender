@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Header } from "./components/Header";
 import TabNavigation from "./components/TabNavigation";
 import MainContent from "./components/MainContent";
 import { ScrapeResult, CustomPreferences } from "./types";
+import { QueryClientProvider } from "@tanstack/react-query";
+import queryClient from "./queries/queryClient";
 
 const BACKEND_URL = process.env.VITE_BACKEND_URL;
 
@@ -65,26 +67,28 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white">
-      <div className="container mx-auto px-4 py-8">
-        <Header />
-        <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
-        <MainContent
-          activeTab={activeTab}
-          url={url}
-          loading={loading}
-          showCustomize={showCustomize}
-          preferences={preferences}
-          result={result}
-          error={error}
-          onUrlChange={setUrl}
-          onAnalyze={handleScrape}
-          onToggleCustomize={() => setShowCustomize(!showCustomize)}
-          onPreferencesChange={setPreferences}
-          onSendMessage={handleChatMessage}
-        />
+    <QueryClientProvider client={queryClient}>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white">
+        <div className="container mx-auto px-4 py-8">
+          <Header />
+          <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+          <MainContent
+            activeTab={activeTab}
+            url={url}
+            loading={loading}
+            showCustomize={showCustomize}
+            preferences={preferences}
+            result={result}
+            error={error}
+            onUrlChange={setUrl}
+            onAnalyze={handleScrape}
+            onToggleCustomize={() => setShowCustomize(!showCustomize)}
+            onPreferencesChange={setPreferences}
+            onSendMessage={handleChatMessage}
+          />
+        </div>
       </div>
-    </div>
+    </QueryClientProvider>
   );
 }
 
